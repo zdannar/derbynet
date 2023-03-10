@@ -1,6 +1,7 @@
 version: '3'
 services:
   derbynet:
+    platform: linux/amd64
     ports:
       - "80:80"
     hostname: derbynet
