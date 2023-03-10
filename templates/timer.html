@@ -20,6 +20,7 @@ require_permission(SET_UP_PERMISSION);
 <link rel="stylesheet" type="text/css" href="css/mobile.css"/>
 <link rel="stylesheet" type="text/css" href="css/timer.css"/>
 <script type="text/javascript" src="js/jquery.js"></script>
+<script type="text/javascript" src="js/jquery-ui.min.js"></script>
 <script type="text/javascript" src="js/mobile.js"></script>
 <script type="text/javascript" src="js/ajax-setup.js"></script>
 <script type="text/javascript" src="js/modal.js"></script>
@@ -44,6 +45,8 @@ $(function() { g_page_loaded = Date.now(); });
 <script type="text/javascript" src="js/timer/host_poller.js"></script>
 <script type="text/javascript" src="js/timer/logger.js"></script>
 <script type="text/javascript" src="js/timer/prober.js"></script>
+<script type="text/javascript" src="js/timer/remote_start.js"></script>
+<script type="text/javascript" src="js/timer/gui.js"></script>
 <script type="text/javascript" src="js/timer/main.js"></script>
 @ELECTRON_ONLY_START@
 <script type="text/javascript" src="js/timer/serial_port_event_listener.js"></script>
@@ -62,6 +65,23 @@ $(function() {
 });
 </script>
 @ELECTRON_ONLY_END@
+<script type="text/javascript">
+
+if (!g_standalone) {
+  $(window).bind("beforeunload", function(event) {
+    if (g_timer_proxy) {
+      // Chrome ignores the prompt and substitutes its own generic message.  Gee, thanks.
+      show_modal("#leaving_modal");
+      setTimeout(function() { close_modal("#leaving_modal"); }, 10000);
+      var prompt =
+          "Leaving this page will disconnect the timer.  Are you sure you want to exit?";
+      event.preventDefault();
+      event.returnValue = prompt;
+      return prompt;
+    }
+  });
+}
+</script>
 </head>
 <body>
 <div id="standalone-banner" class="banner">
@@ -106,6 +126,13 @@ $(function() {
   </div><!-- middle-container -->    
 
   <div id="lower-container">
+    <div id="racing-div" class="hidden">
+      <div id="racing-round"></div>
+      <div id="racing-lanes"></div>
+      <div id="last-reported-round"></div>
+      <div id="last-reported-lanes"></div>
+    </div>
+
     <div id="connect-button-div" class="block_buttons host hidden">
       <input id="connect-button" type="submit" form="host-side-form" value="Connect"/>
     </div><!-- No gap between inline-block elements
@@ -138,10 +165,29 @@ $(function() {
 </div>
 
 <div id="no-serial-api-modal" class="modal_dialog hidden block_buttons">
-    <div id="no-serial-api">
-        This browser does not support <br/><b>Web Serial API</b><br/>and so cannot communicate with your timer.
-        Please try a different browser.
+    <div id="no-serial-api" class='hidden'>
+        <p>Communicating with your timer
+           requires browser support for the
+           <br/><b>Web Serial API</b>.</p>
+        <p>Please try a different browser.</p>
+        <p>(A recent version of
+           <br/><b>Chrome</b>,
+           <b>Edge</b>, or <b>Opera</b><br/>
+           browser is recommended.)</p>
     </div>
+    <div id="no-serial-api-http" class='hidden'>
+        <p>Communicating with your timer
+           requires browser support for the
+          <br/><b>Web Serial API</b>.</p>
+        <p>Most browsers that support the API
+           require a "secure context;" <br/>
+           please try visiting <a></a> instead.</p>
+    </div>
+</div>
+
+<div id="competing-modal" class="modal_dialog hidden block_buttons">
+  <p>Please close this window.</p>
+  <p>Another timer interface is running and competing with this window.</p>
 </div>
 
 <div id="leaving_modal" class="modal_dialog hidden">

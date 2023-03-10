@@ -3,7 +3,6 @@
 // $_POST['div_id'] = the numeric partitionid
 // $_POST['group_field'] = 'classid' or 'rankid'
 // $_POST['group_id'] = numeric classid or rankid the (sub)partition racers will move to.
-// $_POST['cleanup'] = 1 if empty classes/ranks should be deleted after move
 //
 // If the racers to move should be further limited based on their
 // currently-assigned class or rank, these are present:
@@ -15,6 +14,7 @@
 require_once('inc/partitions.inc');
 require_once('inc/newracer.inc');
 require_once('inc/class_add_or_delete.inc');
+require_once('inc/rank_add_or_delete.inc');
 require_once('inc/events.inc');
 
 function move_partition($div_id, $group_field, $group_id, $from_group_field, $from_group_id) {
@@ -86,9 +86,7 @@ if (!have_permission(CONTROL_RACE_PERMISSION)) {
                 $_POST['group_field'], $_POST['group_id'],
                 @$_POST['from_group_field'], @$_POST['from_group_id']);
 
-  if (isset($_POST['cleanup']) && $_POST['cleanup']) {
-    clean_up_empty_classes_and_ranks();
-  }
+  clean_up_empty_classes_and_ranks();
 
   reorder_partitions();
 

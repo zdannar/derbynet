@@ -92,6 +92,14 @@ var g_kiosk_page_handlers = {
       $('<label for="' + k_id + '">Confetti</label>').appendTo(kiosk_select);
     }
   },
+  'kiosks/qrcode.kiosk': {
+    configure: function(kiosk, kiosk_select) {
+      $('<input type="button" value="Configure"/>')
+        .on("click", /* selector */null, /* data: */kiosk,
+            /* handler */ show_config_qrcode_modal)
+        .appendTo(kiosk_select);
+    }
+  },
 };
 
 // Configuration function for parameters of {classids: [...]}
@@ -178,6 +186,9 @@ function process_polled_data(data) {
     hash = hash_string(hash, kiosk.last_contact);
     hash = hash_string(hash, kiosk.page);
     hash = hash_string(hash, JSON.stringify(kiosk.parameters));
+
+    $("#kiosk_control_group .kiosk_control .reload p.reloading").eq(i)
+      .toggleClass('hidden', !kiosk.reload);
   }
   if (hash != g_kiosk_hash) {
     g_kiosk_hash = hash;
@@ -244,6 +255,12 @@ function generate_kiosk_control(index, kiosk, pages) {
       $("<p class=\"last_contact\"/>").text("Last contact: " + kiosk.age + "s ago"));
   }
   kiosk_ident.appendTo(kiosk_control);
+
+  kiosk_control.append($("<div/>").addClass('reload')
+                       .append($("<input type='button' value='Reload' onclick='reload_kiosk(this)'/>")
+                               .attr('kiosk-address', kiosk.address))
+                       .append($("<p class='reloading'>Reloading</p>")
+                               .toggleClass('hidden', !kiosk.reload)));
 
   var kiosk_select = $("<div class='kiosk-select'/>");
   kiosk_select.append("<label for=\"kiosk-page-" + index + "\">Displaying:</label>");
@@ -442,6 +459,25 @@ function show_config_classes_modal(event) {
   });
 }
 
+function show_config_qrcode_modal(event) {
+  var kiosk = event.data;  // { title, content }
+  $("#qrcode-content").val(g_url + "/vote.php");
+  if (kiosk.parameters) {
+    if (kiosk.parameters.title) {
+      $("#qrcode-title").val(kiosk.parameters.title);
+    }
+    if (kiosk.parameters.content) {
+      $("#qrcode-content").val(kiosk.parameters.content);
+    }
+  }
+  show_modal("#config_qrcode_modal", function(event) {
+    close_modal("#config_qrcode_modal");
+    post_new_params(kiosk, {title: $("#qrcode-title").val(),
+                            content: $("#qrcode-content").val()});
+    return false;
+  });
+}
+
 function show_config_title_and_classes_modal(event) {
   show_config_classes_modal(event);
   var kiosk = event.data;  // {name:, address:, page:, parameters: }
@@ -495,6 +531,18 @@ function post_new_params(kiosk, new_params) {
                  params: JSON.stringify(new_params)},
           success: function(data) {
             process_polled_data(data);
+          },
+         });
+}
+
+function reload_kiosk(btn) {
+  $.ajax(g_action_url,
+         {type: 'POST',
+          data: {action: 'kiosk.reload',
+                 address: $(btn).attr('kiosk-address')},
+          success: function() {
+            console.log('kiosk.reload for ' + $(btn).attr('kiosk-address'));
+            $(btn).closest(".reload").find("p.reloading").removeClass('hidden');
           },
          });
 }

@@ -1,17 +1,30 @@
 <?php
 
 require_once('inc/partitions.inc');
+require_once('inc/name-mangler.inc');
 
 function export_roster(callable $out) {
   global $db;
+
+  $use_groups = use_groups();
+  $use_subgroups = use_subgroups();
+  $name_style = read_name_style();
+
   $headings = array();
-  $headings[] = "First Name";
-  $headings[] = "Last Name";
+  if ($name_style == FULL_NAME) {
+    $headings[] = "First Name";
+    $headings[] = "Last Name";
+  } else {
+    $headings[] = "Name";
+  }
   $headings[] = "Car Number";
   $headings[] = "Car Name";
-  $headings[] = group_label();
-  $headings[] = subgroup_label();
-  $headings[] = 'Passed?';
+  if ($use_groups) {
+    $headings[] = group_label();
+  }
+  if ($use_subgroups) {
+    $headings[] = subgroup_label();
+  }
   $headings[] = 'Excluded?';
 
   $out($headings);
@@ -31,21 +44,32 @@ function export_roster(callable $out) {
                      .' FROM '.inner_join('RegistrationInfo',
                                           'Classes', 'RegistrationInfo.classid = Classes.classid',
                                           'Ranks', 'RegistrationInfo.rankid = Ranks.rankid')
-                     // TODO passed?  excluded?
+                     .' WHERE passedinspection = 1'
                      .' ORDER BY '.'lastname, firstname'
     );
   if ($stmt === false) {
     // TODO
   }
   foreach ($stmt as $row) {
-    $out(array($row['firstname'],
-               $row['lastname'],
-               $row['carnumber'],
-               $row['carname'],
-               $row['classname'],
-               $row['rankname'],
-               $row['passedinspection'],
-               $row['exclude']));
+    if ($name_style == FULL_NAME) {
+      $line = array($row['firstname'],
+                    $row['lastname']);
+    } else {
+      $line = array(mangled_name($row, $name_style));
+    }
+
+    $line[] = $row['carnumber'];
+    $line[] = $row['carname'];
+
+    if ($use_groups) {
+      $line[] = $row['classname'];
+    }
+    if ($use_subgroups) {
+      $line[] = $row['rankname'];
+    }
+    $line[] = $row['exclude'];
+
+    $out($line);
   }
 }
 

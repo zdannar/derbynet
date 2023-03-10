@@ -47,10 +47,14 @@ class ImportRoster extends ImportCsvGenerator {
   }
 
   protected function make_relabeling_section() {
-    ?>
-    <label for="partition-label">A partition is called a(n):</label>
-     <input id="partition-label" name="partition-label" type="text" class="not-mobile"
-            value="<?php echo partition_label(); ?>"/>
+    ?><br/>
+        <label for="supergroup-label">The full roster is a (or the)</label>
+        <input id="supergroup-label" name="supergroup-label" type="text" class="not-mobile"
+               value="<?php echo supergroup_label(); ?>"/>,
+        <br/>
+        <label for="partition-label">and a sub-division is a(n)</label>
+        <input id="partition-label" name="partition-label" type="text" class="not-mobile"
+               value="<?php echo partition_label(); ?>"/>.
     <?php
   }
 }
@@ -87,6 +91,8 @@ function all_partitions() {
                                                             'required' => false),
                                        'carname' => array('name' => "Car Name",
                                                           'required' => false),
+                                       'note_from' => array('name' => 'From',
+                                                            'required' => false),
                                        'exclude' => array('name' => 'Exclude?',
                                                           'required' => false)),
                                      array(

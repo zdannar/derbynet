@@ -22,6 +22,26 @@ function json_common_1($key, &$now_running) {
     $stmt->execute(array());
     json_out('best-times', $stmt->fetchAll(PDO::FETCH_ASSOC));
     break;
+  case 'car-numbers':
+    require_once('inc/schema_version.inc');
+    if (schema_version() < PARTITION_SCHEMA) {
+      $car_numbers = $db->query(
+        'SELECT classid AS partitionid,'
+        .' MAX(carnumber) AS max_carnumber'
+        .' FROM RegistrationInfo'
+        .' GROUP BY classid')->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+      // NOTE: 100 * partitionid also appears in checkin.js
+      $car_numbers = $db->query(
+        'SELECT partitionid,'
+        .' (SELECT COALESCE(MAX(carnumber), 100 * Partitions.partitionid)'
+        .'  FROM RegistrationInfo'
+        .'  WHERE Partitions.partitionid = RegistrationInfo.partitionid)'
+        .' AS max_carnumber'
+        .' FROM Partitions')->fetchAll(PDO::FETCH_ASSOC);
+    }
+    json_out('car-numbers', $car_numbers);
+    break;
   case 'classes':
     require_once('inc/json-classes.inc');
     json_out('classes', json_all_classes());
@@ -29,6 +49,10 @@ function json_common_1($key, &$now_running) {
   case 'current-heat':
     require_once('inc/json-current-heat.inc');
     json_out('current-heat', json_current_heat($now_running));
+    break;
+  case 'ondeck':
+    require_once('inc/json-ondeck.inc');
+    json_out('ondeck', json_ondeck($now_running));
     break;
   case 'heat-results':
     if ($now_running['roundid'] == TIMER_TEST_ROUNDID) {
@@ -106,6 +130,10 @@ function json_common_1($key, &$now_running) {
   case 'rounds':
     require_once('inc/json-rounds.inc');
     json_out('rounds', json_all_rounds($now_running));
+    break;
+  case 'schedule':
+    require_once('inc/json-schedule.inc');
+    json_out('schedule', json_schedule($now_running['roundid']));
     break;
   case 'timer-state':
     require_once('inc/json-timer-state.inc');

@@ -86,25 +86,8 @@ Check us out <a href="http://jeffpiazza.github.io/derbynet/" target="_blank">on 
 
 <?php
 $urls = preferred_urls();
-if ($urls === false) {
-  // gethostname() may be something like "instance-1", possibly with a non-routable IP.
-  $addrs = gethostbynamel(gethostname());
-  $urls = array();
 
-  // IIS apparently doesn't set REQUEST_URI.
-  if (isset($_SERVER['REQUEST_URI'])) {
-	$uri = dirname($_SERVER['REQUEST_URI']);
-  } else {
-	$uri = '/...';
-  }
-
-  for ($i = 0; $i < count($addrs); ++$i) {
-    $urls[] = "http://".$addrs[$i].$uri;
-  }
-}
-
-
-if (count($urls) == 0) {
+if (count($urls) == 0 || empty($urls[0])) {
   echo "<p>The local IP address for this server can't be determined.</p>\n";
 } else {
   echo '<p>It looks like you can use ';
@@ -119,7 +102,7 @@ if (count($urls) == 0) {
 ?>
 
 <p>Please include this page if you wish to report a bug, and
-   contact me at <a href="mailto:bugs@jeffpiazza.org">bugs@jeffpiazza.org</a>.</p>
+   contact me at <a href="mailto:bugs@derbynet.org">bugs@derbynet.org</a>.</p>
 
 <p>Your browser's User Agent string is<br/><span id="useragent"></span>.</p>
 
@@ -147,7 +130,7 @@ if (count($urls) == 0) {
 ?>
 <h4>Database Configuration</h4>
 <?php
-    $configdir = isset($_SERVER['CONFIG_DIR']) ? $_SERVER['CONFIG_DIR'] : 'local';
+    $configdir = isset($_SERVER['DERBYNET_CONFIG_DIR']) ? $_SERVER['DERBYNET_CONFIG_DIR'] : 'local';
     if (have_permission(SET_UP_PERMISSION)) {
       $config_content = @file_get_contents($configdir.DIRECTORY_SEPARATOR.'config-database.inc',
                                            /* use_include_path */ true);

@@ -6,7 +6,7 @@ import org.jeffpiazza.derby.LogWriter;
 import org.jeffpiazza.derby.Message;
 import org.jeffpiazza.derby.serialport.SerialPortWrapper;
 
-public class SmartLineLegacy extends TimerDeviceCommon implements TimerDevice {
+public class SmartLineLegacy extends TimerDeviceCommon {
   private int numberOfLanes;  // Detected at probe time
 
   private static final String READ_DECIMAL_PLACES = "od\r";
@@ -80,7 +80,6 @@ public class SmartLineLegacy extends TimerDeviceCommon implements TimerDevice {
     while ((s = portWrapper.next(deadline)) != null) {
       // eTekGadget SmartLine Timer v20.06 (B0007)
       if (s.indexOf("eTekGadget SmartLine Timer") >= 0) {
-        has_ever_spoken = true;
         timerIdentifier = s;
 
         portWrapper.write(RESET);

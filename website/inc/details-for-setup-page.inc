@@ -94,7 +94,9 @@ function inspect_database() {
       if ($schema_version < 2) { $sorting_field = 'class'; }
 
       $dens = array();
-      foreach ($db->query('SELECT class FROM Classes ORDER BY '.$sorting_field) as $row) {
+      foreach ($db->query('SELECT class FROM Classes'
+                          .($schema_version < 3 ? '' : ' WHERE constituents IS NULL or constituents = \'\'')
+                          .' ORDER BY '.$sorting_field) as $row) {
         $dens[] = $row['class'];
       }
       $result['dens'] = $dens;
@@ -208,8 +210,8 @@ function plural_to_be($n, $single, $plural) {
 function diagnose_configuration() {
   global $db_connection_string;
 
-  $config_dir = isset($_SERVER['CONFIG_DIR'])
-      ? $_SERVER['CONFIG_DIR']
+  $config_dir = isset($_SERVER['DERBYNET_CONFIG_DIR'])
+      ? $_SERVER['DERBYNET_CONFIG_DIR']
       // dirname 2 levels up, because we're in the /inc subdirectory
       : (dirname(dirname(__FILE__)).DIRECTORY_SEPARATOR.'local');
 

@@ -69,7 +69,43 @@
   margin: 5px;
 }
 
+#profiles-div.racing {
+  height: 30px;
+  overflow-y: scroll;
+}
+
 #lower-container {
+  margin-top: 20px;
+}
+
+#racing-div {
+  width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 50px;
+}
+
+#racing-lanes {
+  margin-bottom: 10px;
+}
+#racing-lanes .rlane,
+#last-reported-lanes .rlane {
+  display: inline-block;
+  border: solid black 2px;
+  text-align: center;
+}
+
+                     .rlane.masked,
+#racing-lanes        .rlane.masked,
+#last-reported-lanes .rlane.masked {
+  border: solid white 2px;
+}
+.rlane img {
+  vertical-align: bottom;
+}
+
+#events {
+  font-size: 15px;
   margin-top: 20px;
 }
 
@@ -84,18 +120,24 @@
   width: 400px;
 }
 
-#no-serial-api {
+#no-serial-api,
+#no-serial-api-http,
+#no-serial-api p,
+#no-serial-api-http p
+{
   text-align: center;
   font-size: 20px;
   margin: 20px;
 }
 
-#need-gesture-modal {
+#need-gesture-modal,
+#competing-modal {
   width: 400px;
   height: 200px;
   padding-top: 50px;
 }
-#need-gesture-modal p {
+#need-gesture-modal p,
+#competing-modal p {
   font-size: 18px;
   text-align: center;
 }

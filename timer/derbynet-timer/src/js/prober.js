@@ -18,6 +18,9 @@ class Prober {
     var re = new RegExp(prof.prober.responses[ri]);
     var s;
     while ((s = await pw.next(deadline)) != null) {
+      if (Flag.debug_serial.value) {
+        g_logger.debug_msg('   prober sees <<' + describeString(s) + '>>');
+      }
       if (re.test(s)) {
         ++ri;
         if (ri >= prof.prober.responses.length) {
@@ -27,6 +30,9 @@ class Prober {
       }
     }
 
+    if (Flag.debug_serial.value) {
+      g_logger.debug_msg('   probe match failed for /' + prof.prober.responses[ri] + '/');
+    }
     return false;
   }
 
@@ -37,6 +43,7 @@ class Prober {
   // if not.
   async probe_until_found() {
     if (this.probe_cycle_underway) {
+      console.log('probe_until_found quits because probe cycle underway');
       return;
     }
     this.probe_cycle_underway = true;
@@ -60,8 +67,11 @@ class Prober {
       while (!g_timer_proxy && !this.give_up) {
         g_timer_proxy = await g_prober.probe();
       }
-      if (g_host_poller && g_timer_proxy) {
-        g_host_poller.offer_remote_start(g_timer_proxy.has_remote_start());
+      if (g_timer_proxy) {
+        Flag.apply_all();
+        if (g_host_poller) {
+          g_host_poller.offer_remote_start(g_timer_proxy.has_remote_start());
+        }
       }
     } finally {
       this.probe_cycle_underway = false;
@@ -84,21 +94,21 @@ class Prober {
     var n_ports = g_ports.length;
 
     for (var porti in g_ports) {
-      $("#ports-list li").removeClass('probing')
-      if (g_ports.length != n_ports) {
+      Gui.probe_port(-1);
+
+      if (g_ports.length != n_ports || this.give_up) {
         break;
       }
 
       if (this.user_chosen_port >= 0 && this.user_chosen_port != porti) {
         continue;
       }
-      
-      $("#ports-list li").eq(porti).addClass('probing')
 
+      Gui.probe_port(porti);
       var port = g_ports[porti];
       for (var profi in profiles) {
-        $("#profiles-list li").removeClass('probing');
-        if (g_ports.length != n_ports) {
+        Gui.probe_profile(-1);
+        if (g_ports.length != n_ports || this.give_up) {
           break;
         }
         var prof = profiles[profi];
@@ -128,7 +138,7 @@ class Prober {
         console.log("Probing for " + prof.name + ' on port ' + porti + ' ' + label);
         g_logger.internal_msg("Probing for " + prof.name + ' on port ' + porti + ' ' + label);
 
-        $("#profiles-list li").eq(profi).addClass('probing');
+        Gui.probe_profile(profi);
 
         var pw = new PortWrapper(port);
         pw.eol = prof.options.eol;
@@ -138,11 +148,16 @@ class Prober {
             .catch((e) => {
               g_logger.internal_msg('Caught exception trying to open port ' + porti);
               g_logger.stacktrace(e);
-              $("#ports-list li").eq(porti).removeClass('probing').addClass('trouble');
+              Gui.probe_port_trouble(porti);
               opened_ok = false;
             });
           if (!opened_ok) {
-            break;  // No more profiles for this port
+            // Remove the bad port.
+            g_ports.splice(porti, 1);
+            // If we tried opening the port when user_chosen_port wasn't zero,
+            // then user_chosen_port was the bad port, so set it to zero.
+            this.user_chosen_port = 0;
+            break;
           }
 
           var timer_id;
@@ -157,18 +172,12 @@ class Prober {
           }
 
           if (timer_id !== false) {
-            console.log('*    Matched ' + prof.name + '!');
-            g_logger.internal_msg('IDENTIFIED ' + prof.name);
-
-            $("#ports-list li").eq(porti).removeClass('probing user-chosen').addClass('chosen');
-            $("#profiles-list li").eq(profi).removeClass('probing user-chosen').addClass('chosen');
-
-            TimerEvent.sendAfterMs(1000, 'IDENTIFIED', [prof.name, timer_id]);
-            $("#probe-button").prop('disabled', true);
+            this.on_successful_match(porti, profi, prof, timer_id);
 
             // Avoid closing pw on the way out:
             var pw0 = pw;
             pw = null;
+
             return new TimerProxy(pw0, prof);
           }
         } finally {
@@ -176,10 +185,28 @@ class Prober {
             await pw.close();
           }
         }
-        $("#profiles-list li").removeClass('probing chosen');
+        Gui.probe_profile(-1);
       }
-      $("#ports-list li").removeClass('probing chosen');
+      Gui.probe_port(-1);
     }
+  }
+
+  on_successful_match(porti, profi, prof, timer_id) {
+    console.log('*    Matched ' + prof.name + '!');
+    g_logger.internal_msg('IDENTIFIED ' + prof.name);
+
+    Gui.prober_complete(porti, profi);
+
+    var vid = '';
+    var pid = '';
+    var usb_info = g_ports[porti].getInfo();
+    if (usb_info.hasOwnProperty('usbVendorId') && usb_info.hasOwnProperty('usbProductId')) {
+      vid = usb_info.usbVendorId.toString(16).padStart(4, '0');
+      pid = usb_info.usbProductId.toString(16).padStart(4, '0');
+    }
+    TimerEvent.sendAfterMs(1000, 'IDENTIFIED', [prof.name, prof.hasOwnProperty('prober'),
+                                                timer_id, vid, pid]);
+    $("#probe-button").prop('disabled', true);
   }
 }
 

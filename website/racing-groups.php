@@ -46,6 +46,28 @@ $(function() {
 
 <div id="race-rules">
 
+<div class="labels">
+  <label for="supergroup-label">The full roster is a (or the)</label>
+  <input id="supergroup-label" name="supergroup-label" type="text" class="not-mobile"
+               value="<?php echo supergroup_label(); ?>"/>,
+  <label for="partition-label">and a sub-division is a(n)</label>
+  <input id="partition-label" name="partition-label" type="text" class="not-mobile"
+               value="<?php echo partition_label(); ?>"/>.
+</div>
+
+<div class="block_buttons">
+  <input id="add-partition-button" class="modest-button" type="button"
+         value="Add <?php echo partition_label(); ?>"/>
+</div>
+
+
+<div class="switch">
+<label for="use-subgroups">Use Subgroups?</label>
+<input id="use-subgroups" type="checkbox" class="flipswitch"
+     data-on-text="Yes" data-off-text="No"
+       <?php if (use_subgroups()) echo "checked=\"checked\""; ?>/>
+</div>
+
   <input id="by-partition-radio" type="radio" name="form-groups-by" value="by-partition"/>
    <label for="by-partition-radio">Race each
        <span class="partition-label-lc"><?php echo partition_label_lc(); ?></span>
@@ -56,57 +78,30 @@ $(function() {
 
 <input id="custom-group-radio" type="radio" name="form-groups-by" value="custom"/>
 <label for="custom-group-radio">Custom racing groups</label>
-
-<div class="switch">
-<label for="use-subgroups">Use Subgroups?</label>
-<input id="use-subgroups" type="checkbox" class="flipswitch"
-     data-on-text="Yes" data-off-text="No"
-       <?php if (use_subgroups()) echo "checked=\"checked\""; ?>/>
-</div>
-
-<div class="switch">
-<label for="cleanup">Remove unpopulated groups and subgroups?</label>
-<input id="cleanup" type="checkbox" class="flipswitch"
-     data-on-text="Yes" data-off-text="No"
-       <?php if (true) echo "checked=\"checked\""; ?>/>
-</div>
-
-<div style="margin-top: 10px;">
-  <ul id="aggregate-groups" class="mlistview">
-  </ul>
-</div>
-
-<div class="block_buttons">
-  <input id="add-partition-button" type="button" value="Add <?php echo partition_label(); ?>"/>
-  <input id="add-aggregate-button" type="button" value="Add Aggregate"/>
-</div>
-
+      
 </div><!-- race-rules -->
 
 <div id="race-structure">
 
-<p class="instructions">
-    Drag <span class="group-color">&nbsp;</span> groups
-    <span class="and-subgroups">
-        and <span class="subgroup-color">&nbsp;</span> subgroups
-    </span>
-    to re-order.</p>
-       
-<p class="instructions custom">
-    Drag <span class="partition-color">&nbsp;</span>
-          <span class="partition-label-pl-lc"><?php echo partition_label_pl_lc(); ?></span>
-    onto <span class="group-color">&nbsp;</span> groups
-    <span class="and-subgroups" style="white-space: nowrap;">
-        and <span class="subgroup-color">&nbsp;</span> subgroups</span>
-    to customize.
-</p>
+<p class="instructions" id="drag-groups">Drag <span class="group-color">&nbsp;</span> groups to reorder.</p>
+<p class="instructions" id="drag-subgroups">Drag <span class="subgroup-color">&nbsp;</span> subgroups
+        to reorder<span id="or-to-move"> or to move to another group</span>.</p>
 
-<ul id="all-groups" class="mlistview">
+<ul id="all-groups">
 
-  <li id='new-group' class='group subgroup'>
-    <p>New Group</p>
+  <li id='new-group' class='group' data-classid="-1">
+    <p class='class-name'>New Group</p>
+    <ul class='subgroups'></ul>
   </li>
 </ul>
+
+<ul id="aggregate-groups" class="mlistview">
+</ul>
+
+<div class="block_buttons">
+  <input id="add-aggregate-button" class="modest-button" type="button"
+         value="Add Aggregate"/>
+</div>
 
 </div><!-- race-structure -->
 
@@ -166,8 +161,8 @@ $(function() {
     <input id="edit_class_name" name="name" type="text"/>
 
    <div class="ntrophies">
-    <label for='edit-class-ntrophies'>Number of speed&nbsp;trophies:</label>
-    <select id='edit-class-ntrophies' name='ntrophies'>
+    <label for='edit_class_ntrophies'>Number of speed&nbsp;trophies:</label>
+    <select id='edit_class_ntrophies' name='ntrophies'>
       <option value="-1">Default</option>
       <option>0</option>
       <option>1</option>
@@ -209,19 +204,6 @@ $(function() {
            class="delete_button"
            onclick="handle_delete_class(this);"/>
     </div>
-  </form>
-</div>
-
-<div id="add_rank_modal" class="modal_dialog hidden block_buttons">
-  <h3>Add New <span class="subgroup-label"><?php echo subgroup_label(); ?></span></h3>
-  <form>
-    <input type="hidden" name="action" value="rank.add"/>
-    <input type="hidden" name="classid"/>
-    <input name="name" type="text"/>
-
-    <input type="submit"/>
-    <input type="button" value="Cancel"
-           onclick="close_add_rank_modal();"/>
   </form>
 </div>
 

@@ -68,12 +68,13 @@ if (have_permission(SET_UP_PERMISSION)) {
                                     ':carnumber' => $_POST['carnumber'],
                                     ':partitionid' => $partitionid,
                                     ':classid' => $classid),
-                              array(':carnumber' => $_POST['carnumber'],
-                                    ':lastname' => $_POST['lastname'],
+                              array(':lastname' => $_POST['lastname'],
                                     ':firstname' => $_POST['firstname'],
+                                    ':carnumber' => $_POST['carnumber'],
+                                    ':carname' => $_POST['carname'],
+                                    ':partitionid' => $partitionid,
                                     ':classid' => $classid,
                                     ':rankid' => $rankid,
-                                    ':partitionid' => $partitionid,
                                     ':passedinspection' => 1,
                                     ':exclude' => 0));
   $roundid = get_or_create_id('roundid', 'Rounds',
@@ -95,7 +96,7 @@ if (have_permission(SET_UP_PERMISSION)) {
                    array(':roundid' => $roundid,
                          ':classid' => $classid,
                          ':racerid' => $racerid));
-  if ($json_out.outcome.summary != 'failure') {
+  if ($json_out['outcome']['summary'] != 'failure') {
     json_success();
   }
 } else {

@@ -27,6 +27,7 @@ if (have_permission(SET_UP_PERMISSION)) {
                   'partition' => false,
                   'carnumber' => false,
                   'carname' => false,
+                  'note_from' => false,
                   'exclude' => false);
 
   // An alternative to separate lastname and firstname parameters is a single
@@ -80,11 +81,13 @@ if ($ok) {
                    'lastname' => $_POST['lastname'],
                    'carnumber' => $carnumber,
                    'carname' => $carname,
+                   'note_from' => $_POST['note_from'],
                    'exclude' => $exclude);
   if (isset($_POST['partition'])) {
     $options['partition'] = trim(@$_POST['partition']);
   }
-  insert_new_racer($options);
+  $racerid = insert_new_racer($options);
+  json_out('racerid', $racerid);
 
   json_success();
 }

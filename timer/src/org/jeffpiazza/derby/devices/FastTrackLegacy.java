@@ -33,8 +33,7 @@ that people could make their own release gates and software and make it work wit
 our cable.
 
 */
-public class FastTrackLegacy extends TimerDeviceCommon implements
-    RemoteStartInterface {
+public class FastTrackLegacy extends TimerDeviceCommon {
   public FastTrackLegacy(SerialPortWrapper portWrapper) {
     super(portWrapper, null);
     gateWatcher = new GateWatcher(portWrapper) {
@@ -107,7 +106,6 @@ public class FastTrackLegacy extends TimerDeviceCommon implements
     String s;
     while ((s = portWrapper.next(deadline)) != null) {
       if (s.indexOf("Micro Wizard") >= 0 || s.indexOf("MICRO WIZARD") >= 0) {
-        has_ever_spoken = true;
         s = portWrapper.next(deadline);
         if (s.startsWith("K")) {
           timerIdentifier = s;
@@ -172,17 +170,24 @@ public class FastTrackLegacy extends TimerDeviceCommon implements
     }
   }
 
-  @Override
-  public boolean hasRemoteStart() {
-    return Flag.fasttrack_automatic_gate_release.value();
-  }
+  private RemoteStartInterface remote_start = new RemoteStartInterface() {
+    @Override
+    public boolean hasRemoteStart() {
+      return Flag.fasttrack_automatic_gate_release.value();
+    }
+
+    @Override
+    public void remoteStart() throws SerialPortException {
+      if (Flag.fasttrack_automatic_gate_release.value()) {
+        LogWriter.serial("Sending remoteStart " + MicroWizard.PULSE_LASER_BIT);
+        portWrapper.writeAndDrainResponse(MicroWizard.PULSE_LASER_BIT, 2, 500);
+      }
+    }
+  };
 
   @Override
-  public void remoteStart() throws SerialPortException {
-    if (Flag.fasttrack_automatic_gate_release.value()) {
-      LogWriter.serial("Sending remoteStart " + MicroWizard.PULSE_LASER_BIT);
-      portWrapper.writeAndDrainResponse(MicroWizard.PULSE_LASER_BIT, 2, 500);
-    }
+  public RemoteStartInterface getRemoteStart() {
+    return remote_start;
   }
 
   // K2 timer may report DNFs as 0.000

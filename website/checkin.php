@@ -7,6 +7,7 @@ require_once('inc/schema_version.inc');
 require_once('inc/photo-config.inc');
 require_once('inc/classes.inc');
 require_once('inc/partitions.inc');
+require_once('inc/locked.inc');
 require_once('inc/checkin-table.inc');
 
 require_permission(CHECK_IN_RACERS_PERMISSION);
@@ -61,21 +62,26 @@ function column_header($text, $o) {
 <link rel="stylesheet" type="text/css" href="css/checkin.css"/>
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+<script type="text/javascript" src="js/qrcode.min.js"></script>
 <script type="text/javascript" src="js/ajax-setup.js"></script>
 <script type="text/javascript">
 var g_order = '<?php echo $order; ?>';
 var g_action_on_barcode = "<?php
   echo isset($_SESSION['barcode-action']) ? $_SESSION['barcode-action'] : "locate";
 ?>";
+
+var g_preferred_urls = <?php echo json_encode(preferred_urls(/*use_https=*/true),
+                                              JSON_HEX_TAG | JSON_HEX_AMP | JSON_PRETTY_PRINT); ?>;
 </script>
 <script type="text/javascript" src="js/mobile.js"></script>
 <script type="text/javascript" src="js/dashboard-ajax.js"></script>
 <script type="text/javascript" src="js/modal.js"></script>
-<script type="text/javascript" src="js/webcam.js"></script>
 <script type="text/javascript" src="js/dropzone.min.js"></script>
 <script type="text/javascript" src="js/partitions-modal.js"></script>
+<script type="text/javascript" src="js/video-device-picker.js"></script>
+<script type="text/javascript" src="js/imagecapture.js"></script>
+<script type="text/javascript" src="js/photo-capture-modal.js"></script>
 <script type="text/javascript" src="js/checkin.js"></script>
-<script type="text/javascript" src="js/checkin-es6.js"></script>
 </head>
 <body>
 <?php
@@ -83,8 +89,10 @@ make_banner('Racer Check-In');
 ?>
 
 <div class="block_buttons">
-  <img src="img/barcode.png" style="position: absolute; left: 16px; top: 80px;"
+  <img id="barcode-button" src="img/barcode.png"
       onclick="handle_barcode_button_click()"/>
+  <input id="mobile-button" type="button" value="Mobile"
+      onclick="handle_qrcode_button_click()"/>
 
   <input class="bulk_button"
         type="button" value="Bulk"
@@ -106,7 +114,7 @@ make_banner('Racer Check-In');
     <th>Photo</th>
     <th><?php echo column_header('Last Name', 'name'); ?></th>
     <th>First Name</th>
-    <th>Car Name</th>
+    <th>Car Name &amp; From</th>
     <th>Passed?</th>
     <?php if ($xbs) {
         echo '<th>'.$xbs_award_name.'</th>';
@@ -143,31 +151,7 @@ make_banner('Racer Check-In');
 
   list($classes, $classseq, $ranks, $rankseq) = classes_and_ranks();
 
-  $sql = 'SELECT racerid, carnumber, lastname, firstname, carname, imagefile,'
-      .(schema_version() < 2 ? "" : " carphoto,")
-      .(schema_version() < 2 ? "class" : "Classes.sortorder").' AS class_sort,'
-      .(schema_version() < 2 ? "rank" : "Ranks.sortorder").' AS rank_sort,'
-      .(schema_version() < PARTITION_SCHEMA
-        ? " 1 AS partitionid, 1 AS partition_sortorder, '".DEFAULT_PARTITION_NAME."' AS partition_name,"
-        : " Partitions.partitionid AS partitionid,"
-         ." Partitions.sortorder AS partition_sortorder,"
-         ." Partitions.name AS partition_name,")
-      .' RegistrationInfo.classid, class, RegistrationInfo.rankid, rank, passedinspection, exclude,'
-      .' EXISTS(SELECT 1 FROM RaceChart WHERE RaceChart.racerid = RegistrationInfo.racerid) AS scheduled,'
-      .' EXISTS(SELECT 1 FROM RaceChart WHERE RaceChart.classid = RegistrationInfo.classid) AS denscheduled,'
-      .' EXISTS(SELECT 1 FROM Awards WHERE Awards.awardname = \''.addslashes($xbs_award_name).'\' AND'
-      .'                                   Awards.racerid = RegistrationInfo.racerid) AS xbs'
-      .' FROM '.(schema_version() < PARTITION_SCHEMA 
-               ? inner_join('RegistrationInfo', 'Classes',
-                            'RegistrationInfo.classid = Classes.classid',
-                            'Ranks',
-                            'RegistrationInfo.rankid = Ranks.rankid')
-               : inner_join('RegistrationInfo', 'Classes',
-                            'RegistrationInfo.classid = Classes.classid',
-                            'Ranks',
-                            'RegistrationInfo.rankid = Ranks.rankid',
-                            'Partitions',
-                            'RegistrationInfo.partitionid = Partitions.partitionid'))
+$sql = checkin_table_SELECT_FROM_sql()
     .' ORDER BY '
           .($order == 'car' ? 'carnumber, lastname, firstname' :
             ($order == 'class'  ? 'class_sort, rank_sort, lastname, firstname' :
@@ -188,6 +172,9 @@ $n = 1;
 foreach ($stmt as $rs) {
   // TODO
   $rs['rankseq'] = $ranks[$rs['rankid']]['seq'];
+  if (is_null($rs['note'])) {
+    $rs['note'] = '';
+  }
   echo "addrow0(".json_encode(json_table_row($rs, $n),
                               JSON_NUMERIC_CHECK | JSON_UNESCAPED_SLASHES |
                               JSON_HEX_AMP | JSON_HEX_TAG | JSON_HEX_APOS).");\n";
@@ -197,6 +184,9 @@ foreach ($stmt as $rs) {
 
 $(function () {
 var partitions = <?php echo json_encode($partitions,
+                                        JSON_NUMERIC_CHECK | JSON_UNESCAPED_SLASHES |
+                                        JSON_HEX_AMP | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
+var partition_label_pl = <?php echo json_encode(partition_label_pl(),
                                         JSON_NUMERIC_CHECK | JSON_UNESCAPED_SLASHES |
                                         JSON_HEX_AMP | JSON_HEX_TAG | JSON_HEX_APOS); ?>;
 
@@ -210,7 +200,7 @@ for (var i in partitions) {
 }
 var opt = $("<option/>")
     .attr('value', -1)
-    .text("(Edit partitions)");
+.text("(Edit " + partition_label_pl + ")");
 opt.appendTo("#edit_partition");
 opt.clone().appendTo("#bulk_who");
 
@@ -232,46 +222,53 @@ mobile_select_refresh($("#bulk_who"));
 
 
 <div id='edit_racer_modal' class="modal_dialog hidden block_buttons">
-<form id="editracerform">
+  <form id="editracerform">
+    <div id="left-edit">
+      <label for="edit_firstname">First name:</label>
+      <input id="edit_firstname" type="text" name="edit_firstname" value=""/>
+      <label for="edit_lastname">Last name:</label>
+      <input id="edit_lastname" type="text" name="edit_lastname" value=""/>
 
-  <input id="edit_racer" type="hidden" name="racer" value=""/>
+      <label for="edit_carno">Car number:</label>
+      <input id="edit_carno" type="text" name="edit_carno" value=""/>
 
-  <label for="edit_firstname">First name:</label>
-  <input id="edit_firstname" type="text" name="edit_firstname" value=""/>
-  <label for="edit_lastname">Last name:</label>
-  <input id="edit_lastname" type="text" name="edit_lastname" value=""/>
+      <label for="edit_carname">Car name:</label>
+      <input id="edit_carname" type="text" name="edit_carname" value=""/>
+    </div>
 
-  <label for="edit_carno">Car number:</label>
-  <input id="edit_carno" type="text" name="edit_carno" value=""/>
-  <br/>
+    <div id="right-edit">
+      <label for="edit_partition">
+        <?php echo htmlspecialchars(partition_label().':', ENT_QUOTES, 'UTF-8'); ?>
+      </label>
+      <!-- Populated by javascript -->
+      <select id="edit_partition" data-wrapper-class="partition_mselect"></select>
 
-  <label for="edit_carname">Car name:</label>
-  <input id="edit_carname" type="text" name="edit_carname" value=""/>
-  <br/>
+      <label for="edit_note_from">From (if desired):</label>
+      <input id="edit_note_from" type="text" name="edit_note_from" value=""/>
 
-  <label for="edit_partition"><?php echo htmlspecialchars(partition_label(), ENT_QUOTES, 'UTF-8'); ?></label>
-  <select id="edit_partition"><!-- Populated by javascript --></select>
-
-  <br/>
-  <label for="eligible">Trophy eligibility:</label>
-    <input type="checkbox" class="flipswitch" name="eligible" id="eligible"
+      <label for="eligible">Trophy eligibility:</label>
+      <input type="checkbox" class="flipswitch" name="eligible" id="eligible"
             data-wrapper-class="trophy-eligible-flipswitch"
             data-off-text="Excluded"
             data-on-text="Eligible"/>
-  <br/>
-  <input type="submit"/>
-  <input type="button" value="Cancel"
-    onclick='close_modal("#edit_racer_modal");'/>
+      <br/>
 
-  <div id="delete_racer_extension">
-    <input type="button" value="Delete Racer"
+      <input type="submit"/>
+      <input type="button" value="Cancel"
+        onclick='close_modal("#edit_racer_modal");'/>
+
+      <div id="delete_racer_extension">
+        <input type="button" value="Delete Racer"
            class="delete_button"
            onclick="handle_delete_racer();"/>
-  </div>
+      </div>
+    </div>
+
+  <input id="edit_racer" type="hidden" name="racer" value=""/>
+
 </form>
 </div>
-  
-  
+
 <div id='photo_modal' class="modal_dialog hidden block_buttons">
   <form id="photo_drop" class="dropzone">
     <input type="hidden" name="action" value="photo.upload"/>
@@ -279,10 +276,13 @@ mobile_select_refresh($("#bulk_who"));
     <input type="hidden" id="photo_modal_racerid" name="racerid"/>
     <input type="hidden" name="MAX_FILE_SIZE" value="30000000" />
 
-    <h3>Capture <span id="racer_photo_repo"></span> photo for <span id="racer_photo_name"></span></h3>
-    <div id="preview">
-        <h2>Does your browser support webcams?</h2>
-    </div>
+    <h3>Capture <span id="racer_photo_repo"></span>
+        photo for <span id="racer_photo_name"></span>
+    </h3>
+
+    <video id="preview" autoplay="true" muted="true" playsinline="true"></video>
+
+    <div id="left-photo">
 
     <?php
       if (headshots()->status() != 'ok') {
@@ -296,17 +296,23 @@ mobile_select_refresh($("#bulk_who"));
         <br/>
         <input type="submit" value="Capture Only"
           onclick='g_check_in = false;'/>
-        <input type="button" value="Switch Camera"
-          onclick='handle_switch_camera();'/>
         <input type="button" value="Cancel"
           onclick='close_photo_modal();'/>
+    </div>
+    </div>
+    <div id="right-photo">
+        <select id="device-picker"></select>
 
         <label id="autocrop-label" for="autocrop">Auto-crop after upload:</label>
         <div class="centered_flipswitch">
           <input type="checkbox" class="flipswitch" name="autocrop" id="autocrop" checked="checked"/>
         </div>
+<div>
+      <a id="thumb-link" class="button_link">To Photo Page</a>
+</div>
     </div>
-    <div class="dz-message"><span>NOTE: You can drop a photo here to upload instead</span></div>
+
+      <div class="dz-message"><span>NOTE: You can drop a photo here to upload instead</span></div>
   </form>
 </div>
 
@@ -358,7 +364,7 @@ mobile_select_refresh($("#bulk_who"));
     
       <input type="submit"/>
       <input type="button" value="Cancel"
-        onclick='close_secondary_modal("#bulk_details_modal");'/>
+        onclick='pop_modal("#bulk_details_modal");'/>
     </form>
 </div>
 
@@ -376,6 +382,18 @@ mobile_select_refresh($("#bulk_who"));
     <label for="barcode-handling-car">Capture car photo</label>
 
     <input type="submit" value="Close"/>
+  </form>
+</div>
+
+<div id="qrcode_settings_modal" class="modal_dialog wide_modal hidden block_buttons">
+  <form id="mobile-checkin-form">
+    <h2>Mobile Check-In</h2>
+    <div id="mobile-checkin-qrcode" style="width: 256px; margin-left: 122px;"></div>
+    <div id="mobile-checkin-title" style="text-align: center; font-size: 1.5em; font-weight: bold; margin-bottom: 25px; margin-top: 10px;"></div>
+    <input id="mobile-checkin-url" name="mobile-checkin-url" type="text" />
+
+    <a id="mcheckin-link" class="button_link" href="mcheckin.php">Mobile Check-In &gt;</a>
+    <input type="button" value="Close" onclick="close_modal('#qrcode_settings_modal');"/>
   </form>
 </div>
 

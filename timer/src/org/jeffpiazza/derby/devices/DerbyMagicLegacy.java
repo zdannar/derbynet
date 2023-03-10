@@ -12,8 +12,7 @@ import org.jeffpiazza.derby.Message;
 // More importantly, "V" responds with "Derby Magic v3.00" or some such.
 // http://www.derbymagic.com/files/Timer.pdf
 // http://www.derbymagic.com/files/GPRM.pdf
-public class DerbyMagicLegacy extends TimerDeviceCommon
-    implements RemoteStartInterface {
+public class DerbyMagicLegacy extends TimerDeviceCommon {
   private TimerResult result = null;
   private long timeOfFirstResult = 0;
 
@@ -63,7 +62,6 @@ public class DerbyMagicLegacy extends TimerDeviceCommon
           timerIdentifier = s;
           portWrapper.writeAndDrainResponse(TIMER_RESET, 1, 200);
           setUp();
-          has_ever_spoken = true;
           return true;
         }
       }
@@ -101,7 +99,6 @@ public class DerbyMagicLegacy extends TimerDeviceCommon
           LogWriter.serial("Detected gate opening");
           // This will be an unexpected state change, if it ever happens
           onGateStateChange(false);
-          has_ever_spoken = true;
           return "";
         }
         return line;
@@ -112,7 +109,6 @@ public class DerbyMagicLegacy extends TimerDeviceCommon
       public String apply(String line) throws SerialPortException {
         Matcher m = singleLanePattern.matcher(line);
         while (m.find()) {
-          has_ever_spoken = true;
           LogWriter.serial("    Early detector match for (" + m.group() + ")");
           int lane = m.group(1).charAt(0) - '1' + 1;
           String time = m.group(2);
@@ -143,14 +139,21 @@ public class DerbyMagicLegacy extends TimerDeviceCommon
     });
   }
 
-  @Override
-  public boolean hasRemoteStart() {
-    return true;
-  }
+  private RemoteStartInterface remote_start = new RemoteStartInterface() {
+    @Override
+    public boolean hasRemoteStart() {
+      return true;
+    }
+
+    @Override
+    public void remoteStart() throws SerialPortException {
+      portWrapper.write(TRIGGER_START_SOLENOID);
+    }
+  };
 
   @Override
-  public void remoteStart() throws SerialPortException {
-    portWrapper.write(TRIGGER_START_SOLENOID);
+  public RemoteStartInterface getRemoteStart() {
+    return remote_start;
   }
 
   protected void raceFinished() throws SerialPortException {

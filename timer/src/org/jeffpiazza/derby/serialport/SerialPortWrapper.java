@@ -3,6 +3,8 @@ package org.jeffpiazza.derby.serialport;
 import jssc.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import org.jeffpiazza.derby.Flag;
 import org.jeffpiazza.derby.LogWriter;
@@ -27,6 +29,8 @@ import org.jeffpiazza.derby.timer.ProfileDetector;
 // port.removeEventListener();
 //
 public class SerialPortWrapper implements SerialPortEventListener {
+  public static final int COMMAND_DRAIN_MS = 100;
+
   private SerialPort port;
   // A sequence of end-of-line characters that should be written
   // at the end of each write().
@@ -45,6 +49,9 @@ public class SerialPortWrapper implements SerialPortEventListener {
   // System time in millis when we last received an event from the serial
   // port; used to detect lost contact.
   private long last_contact;
+
+  // Latches true if any data has been received from the timer.
+  private boolean has_ever_spoken = false;
 
   // A Detector looks for asynchronously-provided data in the data stream.
   // Ordinary Detectors get applied to a complete newly-received line of data
@@ -116,6 +123,10 @@ public class SerialPortWrapper implements SerialPortEventListener {
     return setPortParams(baudRate, dataBits, stopBits, parity,
                          !Flag.clear_rts_dtr.value(),
                          !Flag.clear_rts_dtr.value());
+  }
+
+  public void setDtr(boolean enabled) throws SerialPortException {
+    port.setDTR(enabled);
   }
 
   public void setEndOfLine(String end_of_line) {
@@ -219,6 +230,7 @@ public class SerialPortWrapper implements SerialPortEventListener {
         }
 
         synchronized (leftover) {
+          has_ever_spoken = true;
           s = leftover + s;
           synchronized (detectors) {
             if (earlyDetector != null) {
@@ -314,7 +326,8 @@ public class SerialPortWrapper implements SerialPortEventListener {
             && System.currentTimeMillis() - last_char_received
             > Flag.newline_expected_ms.value()) {
           if (Flag.debug_io.value()) {
-            LogWriter.debugMsg("infer newline(" + describeString(leftover) + ")");
+            LogWriter.
+                debugMsg("infer newline(" + describeString(leftover) + ")");
           }
           // Don't call enqueueLine here, as we want the string to return now.
           s = applyDetectors(leftover);
@@ -365,6 +378,24 @@ public class SerialPortWrapper implements SerialPortEventListener {
 
   public void drain() {
     drain(System.currentTimeMillis() + 500, 1);
+  }
+
+  public void drainForMs(int ms) {
+    long deadline = System.currentTimeMillis() + ms;
+    while (next(deadline) != null)
+      ;
+  }
+
+  public void drainForMs() {
+    drainForMs(COMMAND_DRAIN_MS);
+  }
+
+  public boolean hasEverSpoken() {
+    return has_ever_spoken;
+  }
+
+  public void setHasEverSpoken() {
+    has_ever_spoken = true;
   }
 
   public void writeAndDrainResponse(String cmd, int expectedLines, int timeout)

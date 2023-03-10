@@ -2,8 +2,11 @@
 require_once('inc/name-mangler.inc');
 
 // $output is a file handle for writing
-function export_results(callable $out, $name_style = FULL_NAME) {
+function export_results(callable $out) {
   global $db;
+
+  $name_style = read_name_style();
+
   $headings = array();
   $headings[] = "Class";
   $headings[] = "Round";
@@ -46,17 +49,17 @@ function export_results(callable $out, $name_style = FULL_NAME) {
 
   try {
     foreach ($stmt as $row) {
-      $values = array($row['class'], $row['round'], $row['heat'], $row['lane']);
+      $values = array($row['class'], (int) $row['round'], (int) $row['heat'], (int) $row['lane']);
       if ($name_style == FIRST_NAME_LAST_INITIAL) {
         array_push($values, mangled_name($row, $name_style));
       } else {
         array_push($values, $row['firstname'], $row['lastname']);
       }
       array_push($values, $row['carnumber'], $row['carname'],
-                 $row['finishtime']);
+                 (float) $row['finishtime']);
       // Scale MPH
       array_push($values, $row['finishtime'] == 0 ? "--"
-                 : sprintf("%4.1f", $track_length / $row['finishtime'] * $fps_to_scale_mph));
+                 : (float) sprintf("%4.1f", $track_length / $row['finishtime'] * $fps_to_scale_mph));
       array_push($values, $row['finishplace'], $row['completed']);
                  
       $out($values);
@@ -113,7 +116,7 @@ function export_results_csv($output, $name_style = FULL_NAME) {
         array_push($values, $row['firstname'], $row['lastname']);
       }
       array_push($values, $row['carnumber'], $row['carname'],
-                 $row['finishtime'], $row['finishplace'], $row['completed']);
+                 (float) $row['finishtime'], $row['finishplace'], $row['completed']);
       fputcsv($output, $values);
     }
   } catch (Exception $e) {

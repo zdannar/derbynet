@@ -8,6 +8,7 @@ require_once('inc/replay.inc');
 require_once('inc/remote-start.inc');
 require_once('inc/events.inc');
 require_once('inc/timer-flags.inc');
+require_once('inc/event-lane-details.inc');
 
 // Timer-controller-to-web-service messages:
 //
@@ -48,6 +49,10 @@ if (isset($_POST['remote-start'])) {
   $remote_start = $_POST['remote-start'];
 }
 
+if (isset($_POST['overdue'])) {
+  record_event_to_limit(EVENT_TIMER_OVERDUE, 1000, array('other' => $_POST['overdue']));
+}
+
 $message = $_POST['message'];
 
 $racing_state = get_racing_state();  // True if we're racing, false if not
@@ -56,9 +61,7 @@ $timer_state = new TimerState();     // An object carrying our idea of the timer
 start_response();
 
 if (have_permission(TIMER_MESSAGE_PERMISSION)) {
-  if ($remote_start == 'YES') {
-    set_has_remote_start();
-  }
+  set_has_remote_start($remote_start == 'YES');
 
   if ($message == 'HELLO') {
     // Timer begins in TIMER_SEARCHING, almost the same as unhealthy, until we
@@ -76,11 +79,31 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
     if ($logs_dir === '') {
       $logs_dir = sys_get_temp_dir();
     }
-    if (!substr($logs_dir -1) !== DIRECTORY_SEPARATOR) {
+    if (!substr($logs_dir, -1) !== DIRECTORY_SEPARATOR) {
       $logs_dir = $logs_dir . DIRECTORY_SEPARATOR;
     }
     write_raceinfo("timer-log",
                    $logs_dir . "timer-" . date('Ymd-Hi-s') . ".log");
+    if (isset($_POST['interface'])) {
+      write_raceinfo('timer-interface',
+                     isset($_POST['build'])
+                     ? $_POST['interface'].'-'.$_POST['build']
+                     : $_POST['interface']);
+    }
+    $last_contact = $timer_state->last_contact();
+    $accept = true;
+    if ($last_contact >= 0 && $last_contact + 1 >= time()) {
+      $ua = read_raceinfo('timer-agent');
+      if ($ua && $ua != $_SERVER['HTTP_USER_AGENT']) {
+        $accept = false;
+        echo "<competing>".htmlspecialchars($ua, ENT_QUOTES, 'UTF-8')."</competing>\n";
+      }
+    }
+    // Record the user-agent string of the interface that most recently established contact.
+    // Previously-established interfaces will get <competing/> messages.
+    if ($accept) {
+      write_raceinfo('timer-agent', $_SERVER['HTTP_USER_AGENT']);
+    }
     echo "\n  <success/>\n";
     echo "    <query/>\n";
   } else if ($message == 'IDENTIFIED') {
@@ -102,13 +125,16 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
     if (isset($_POST['options'])) {
       write_raceinfo('timer-options', $_POST['options']);
     }
+    if (@$_POST['vid']) {
+      write_raceinfo('timer-vid', $_POST['vid']);
+    }
+    if (@$_POST['pid']) {
+      write_raceinfo('timer-pid', $_POST['pid']);
+    }
     if (isset($_POST['confirmed']) && $_POST['confirmed'] == 0) {
       $timer_state->to_state(TIMER_UNCONFIRMED);
     } else {
       $timer_state->to_state(TIMER_CONNECTED);
-    }
-    if (isset($_POST['interface'])) {  // 'web' for js-based interface
-      write_raceinfo('timer-interface', $_POST['interface']);
     }
     echo "\n  <success/>\n";
   } else if ($message == 'STARTED') {
@@ -129,7 +155,8 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
       // switch was off.  We should prompt the race coordinator and offer to
       // record these times somewhere.
       echo "\n  <failure code='notracing'>Not racing now.</failure>\n";
-      record_event_for_refused_result($results);
+      write_raceinfo('refused-results', 1 + read_raceinfo('refused-results', 0));
+      record_timer_finish(EVENT_TIMER_RESULT_REFUSED, $results, null);
     } else {
       if (write_heat_results($results)) {
         send_replay_REPLAY();
@@ -137,6 +164,7 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
         $current = get_running_round();
         advance_heat($current, 'next', /* show failure */ false);
         $racing_state = get_racing_state();
+        record_timer_finish(EVENT_HEAT_RESULT_FROM_TIMER, $results, $current);
         echo "\n  <success/>\n";
       }
     }
@@ -150,19 +178,28 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
       if (!$timer_state->unhealthy()) {
         $timer_state->to_state(TIMER_SEARCHING);
       }
-    } else if (isset($_POST['confirmed']) && $_POST['confirmed'] == 0) {
-      $timer_state->to_state(TIMER_UNCONFIRMED);
+    } else if (isset($_POST['confirmed'])) {
+      if ($_POST['confirmed'] == 0) {
+        $timer_state->to_state(TIMER_UNCONFIRMED);
+      } else {
+        // #218: Don't let "confirmed" flip TIMER_STAGING or TIMER_RUNNING back to TIMER_CONNECTED
+        $tstate = $timer_state->state();
+        if ($tstate == TIMER_NOT_CONNECTED || $tstate == TIMER_SEARCHING || $tstate == TIMER_UNCONFIRMED) {
+          $timer_state->to_state(TIMER_CONNECTED);
+        }
+      }
     } else if ($timer_state->unhealthy()) {
       // A good heartbeat converts unhealthy back to connected
       $timer_state->to_state(TIMER_CONNECTED);
     }
+    $ua = read_raceinfo('timer-agent');
+    if ($ua && $ua != $_SERVER['HTTP_USER_AGENT']) {
+      echo "<competing>".htmlspecialchars($ua, ENT_QUOTES, 'UTF-8')."</competing>\n";
+    }
   } else if ($message == 'MALFUNCTION') {
     $error_string = isset($_POST['error']) ? $_POST['error'] : "Malfunction";
     if (!$timer_state->troubled()) {
-      record_event_sql('INSERT INTO Events(tstamp, action, other)'
-                       .' VALUES('.dbnow_expr().', :action, :other)',
-                       array(':action' => EVENT_TIMER_MALFUNCTION,
-                             ':other' => $error_string));
+      record_event(EVENT_TIMER_MALFUNCTION, array('other' => $error_string));
     }
     echo "\n  <success/>\n";
     if ($timer_state->state() == TIMER_NOT_CONNECTED) {
@@ -196,7 +233,7 @@ if (have_permission(TIMER_MESSAGE_PERMISSION)) {
       write_raceinfo('timer_current', '');
     }
   }
-  
+
   $tstate = $timer_state->state();
   if ($racing_state && ($tstate == TIMER_CONNECTED || $tstate == TIMER_UNCONFIRMED)) {
     // i.e., not staging or running

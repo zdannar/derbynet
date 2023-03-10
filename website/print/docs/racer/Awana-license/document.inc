@@ -79,7 +79,8 @@ class AwanaDriversLicenseDocument extends PrintableRacerDocument {
     }
 
     $this->pdf->CenteredSequence($x + 2.35, $y + 1.075,
-                                 array(new SetFontTag('Arial', 'B', 24), $racer['carnumber']));
+                                 array(new SetFontTag('Arial', 'B', 24),
+                                       strval($racer['carnumber'])));
 
     if (!$this->get_option('use_barcode')) {
       $y = $y - 0.15;
@@ -101,7 +102,7 @@ class AwanaDriversLicenseDocument extends PrintableRacerDocument {
                                array(0x02, 0x38, 0x82));
     $this->pdf->SetTextColor(0xf7, 0xd1, 0x17);
     $this->pdf->SetFont('Arial', 'B', 8);
-    $this->pdf->Text($x + 0.95, $y + 1.65, 'Registed Awana Grand Prix Racer');
+    $this->pdf->Text($x + 0.95, $y + 1.65, 'Registered Awana Grand Prix Racer');
     $this->pdf->SetTextColor(0);
   }
 

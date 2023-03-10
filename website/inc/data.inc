@@ -1,5 +1,5 @@
 <?php
-$configdir = isset($_SERVER['CONFIG_DIR']) ? $_SERVER['CONFIG_DIR'] : 'local';
+$configdir = isset($_SERVER['DERBYNET_CONFIG_DIR']) ? $_SERVER['DERBYNET_CONFIG_DIR'] : 'local';
 try {
     @include($configdir.DIRECTORY_SEPARATOR."config-database.inc");
 } catch (PDOException $p) {
@@ -85,6 +85,13 @@ function read_single_value($sql, $params = array(), $def = false) {
   return $row[0];
 }
 
+function execute_once($sql, $params = array()) {
+  global $db;
+  $rs = $db->prepare($sql);
+  $rs->execute($params);
+  $rs->closeCursor();
+}
+
 
 // The RaceInfo table is just a simple ItemKey/ItemValue association, and stores individual
 // configuration settings from GPRM.  As long as there aren't any name conflicts, we can add a 
@@ -127,15 +134,6 @@ function use_subgroups() {
 
 function use_master_sched() {
   return read_raceinfo_boolean('use-master-sched');
-}
-
-function image_base_dir() {
-  return  dirname(__FILE__, 2).DIRECTORY_SEPARATOR."Images";
-}
-function image_file_path($filename) {
-  return image_base_dir().DIRECTORY_SEPARATOR
-      .read_raceinfo("images-dir", 'Generic').DIRECTORY_SEPARATOR
-      .$filename;
 }
 
 function update_period() {

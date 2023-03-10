@@ -107,6 +107,9 @@ public class Connector {
     StdoutMessageTrace.trace("Timer-Server connection established.");
     httpTask.registerHeatReadyCallback(new HttpTask.HeatReadyCallback() {
       public void onHeatReady(int roundid, int heat, int laneMask) {
+        if (timerTask.device() == null) {
+          return;
+        }
         try {
           timerTask.device().prepareHeat(roundid, heat, laneMask);
         } catch (Throwable t) {
@@ -129,17 +132,17 @@ public class Connector {
     httpTask.registerRemoteStart(new HttpTask.RemoteStartCallback() {
       @Override
       public boolean hasRemoteStart() {
-        if (timerTask.device() instanceof RemoteStartInterface) {
-          RemoteStartInterface rs = (RemoteStartInterface) timerTask.device();
-          return rs.hasRemoteStart();
+        if (timerTask.device() == null) {
+          return false;
         }
-        return false;
+        RemoteStartInterface rs = timerTask.device().getRemoteStart();
+        return rs != null && rs.hasRemoteStart();
       }
 
       @Override
       public void remoteStart() {
-        if (timerTask.device() instanceof RemoteStartInterface) {
-          RemoteStartInterface rs = (RemoteStartInterface) timerTask.device();
+        RemoteStartInterface rs = timerTask.device().getRemoteStart();
+        if (rs != null) {
           try {
             LogWriter.serial("Executing remote-start");
             rs.remoteStart();

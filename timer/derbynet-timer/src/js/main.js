@@ -1,3 +1,33 @@
+var g_clock_worker;
+if (window.Worker) {
+  g_clock_worker = new Worker('js/timer/clock-worker.js');
+  g_clock_worker.onmessage = function(e) {
+    var key = e.data.shift();
+    switch (key) {
+    case 'HEARTBEAT':
+      g_host_poller && g_host_poller.heartbeat();
+      break;
+    case 'POLL_TIMER':
+      g_timer_proxy && g_timer_proxy.poll_once();
+      break;
+    case 'EVENT':
+      var event = e.data[0];
+      var args = e.data[1];
+      TimerEvent.trigger(event, args);
+      break;
+    case 'LOGGER':
+      g_logger && g_logger.poll();
+      break;
+    default:
+      console.error('Unrecognized message from clock-worker', key, e.data);
+    }
+  }
+} else {
+  // Insurance: don't crash if browser doesn't support web worker
+  //  (but it won't support web serial api)
+  g_clock_worker = {postMessage: function(data) { console.error('web workers not supported:', data); }};
+}
+
 $(function() {
   var profiles = all_profiles();
   for (var i = 0; i < profiles.length; ++i) {
@@ -39,7 +69,13 @@ $(function() {
     $("#port-button").addClass('hidden');
   }
   if (!('serial' in navigator)) {
-    $("#no-serial-api").removeClass('hidden');
+    if (!window.isSecureContext) {
+      var link = "https://" + window.location.hostname + window.location.pathname;
+      $("#no-serial-api-http p a").prop('href', link).text(link);
+      $("#no-serial-api-http").removeClass('hidden');
+    } else {
+      $("#no-serial-api").removeClass('hidden');
+    }
     show_modal("#no-serial-api-modal");
   } else if (!g_standalone) {
     setTimeout(async function() {
@@ -63,21 +99,6 @@ $(function() {
 function on_gesture_click() {
   close_modal("#need-gesture-modal");
   on_scan_click();
-}
-
-if (!g_standalone) {
-  $(window).bind("beforeunload", function(event) {
-    if (g_timer_proxy) {
-      // Chrome ignores the prompt and substitutes its own generic message.  Gee, thanks.
-      show_modal("#leaving_modal");
-      setTimeout(function() { close_modal("#leaving_modal"); }, 10000);
-      var prompt =
-          "Leaving this page will disconnect the timer.  Are you sure you want to exit?";
-      event.preventDefault();
-      event.returnValue = prompt;
-      return prompt;
-    }
-  });
 }
 
 
@@ -126,6 +147,13 @@ async function on_new_port_click() {
 
 
 async function update_ports_list() {
+  g_ports.sort((p1, p2) => {
+    var p1_usb = p1.getInfo()?.usbProductId && true;
+    var p2_usb = p2.getInfo()?.usbProductId && true;
+    return p1_usb == p2_usb ? 0
+      : p1_usb ? -1 : 1;
+  });
+
   $("#ports-list li").slice(g_ports.length).remove();
   while ($("#ports-list li").length < g_ports.length) {
     // If ports have been added, the old ports may not be in the same positions,
@@ -162,9 +190,23 @@ $(function() {
         isOpen = false;
         break;
       case 'LOST_CONNECTION':
+        console.log('Handling LOST_CONNECTION event.');
         $("#probe-button").prop('disabled', false);
         setTimeout(async function() {
-          g_timer_proxy = await g_prober.probe_until_found(); }, 0);
+          // TODO This conditional teardown call doesn't seem to happen.
+          // Fortunately TimerProxy unregisters itself now, upon receiving a
+          // LOST_CONNECTION event.
+          if (g_timer_proxy) {
+            // issue#187: after a lost connection, the timer proxy et al are
+            // still registered for events, and will duplicate the effect of the
+            // new timer proxy unless torn down.
+            await g_timer_proxy.teardown();
+            g_timer_proxy = null;
+          }
+          console.log('Starting probe after lost connection');
+          await g_prober.probe_until_found();
+          console.log('Probe complete: g_timer_proxy=', g_timer_proxy);
+        }, 0);
         break;
       }
       console.log('onEvent: ' + event + ' ' + (args || []).join(','));
@@ -174,7 +216,6 @@ $(function() {
 
 // The "Scan" button
 async function on_scan_click() {
-  console.log('on_scan_click');
   g_prober.probe_until_found();
 }
 

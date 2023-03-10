@@ -9,8 +9,7 @@ import org.jeffpiazza.derby.LogWriter;
 import org.jeffpiazza.derby.Message;
 import org.jeffpiazza.derby.serialport.SerialPortWrapper;
 
-public class MiscJunkLegacy extends TimerDeviceCommon
-    implements RemoteStartInterface {
+public class MiscJunkLegacy extends TimerDeviceCommon  {
   public MiscJunkLegacy(SerialPortWrapper portWrapper) {
     super(portWrapper, null);
 
@@ -89,7 +88,6 @@ public class MiscJunkLegacy extends TimerDeviceCommon
     while ((s = portWrapper.next(deadline)) != null) {
       if (s.indexOf("vert=") >= 0) {
         timerIdentifier = s;
-        has_ever_spoken = true;
         // Responds either "P" or "O"
         portWrapper.writeAndWaitForResponse(RESET, 500);
 
@@ -159,14 +157,21 @@ public class MiscJunkLegacy extends TimerDeviceCommon
     });
   }
 
-  @Override
-  public boolean hasRemoteStart() {
-    return true;
-  }
+  private RemoteStartInterface remote_start = new RemoteStartInterface() {
+    @Override
+    public boolean hasRemoteStart() {
+      return true;
+    }
+
+    @Override
+    public void remoteStart() throws SerialPortException {
+      portWrapper.writeAndDrainResponse(START_SOLENOID);
+    }
+  };
 
   @Override
-  public void remoteStart() throws SerialPortException {
-    portWrapper.writeAndDrainResponse(START_SOLENOID);
+  public RemoteStartInterface getRemoteStart() {
+    return remote_start;
   }
 
   @Override

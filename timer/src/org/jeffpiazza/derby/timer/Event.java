@@ -25,7 +25,11 @@ public enum Event {
   OVERDUE, // Eventually, overdue results give way to a GIVING_UP event,
   // which is roughly treated like another PREPARE_HEAT_RECEIVED.
   GIVING_UP,
-  LANE_COUNT // Some timers report how many lanes
+  LANE_COUNT, // Some timers report how many lanes
+  GATE_WATCHER_NOT_SUPPORTED,
+  // Some flag changes can affect timer profiles; existing TimerDeviceWithProfile
+  // instances should reload the profile.
+  PROFILE_UPDATED
   ;
 
   public static interface Handler {

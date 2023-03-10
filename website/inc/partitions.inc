@@ -24,7 +24,7 @@ function labels() {
       $labels['subgroup'] = array("Subgroup", "Subgroups");
       break;
     case 'one-group':
-      $labels['group'] = $labels['supergroup'];
+      $labels['group'] = array("Group", "Groups");
       $labels['subgroup'] = $labels['partition'];
       break;
     default:  // custom
@@ -112,10 +112,27 @@ function clean_up_empty_classes_and_ranks() {
   // Organic classes include ranks for which a partition exists.
   // Aggregate classes have either non-empty constituents field or non-empty rankids field.
 
+  /* Some older SQLite implementations don't support this:
   $db->exec('DELETE FROM Ranks AS r1'
             .' WHERE rankid NOT IN (SELECT DISTINCT rankid FROM Partitions)'
             .'   AND (classid NOT IN (SELECT DISTINCT antecedent FROM ConstituentClasses)'
             .'      OR rankid > (SELECT MIN(rankid) FROM Ranks AS r2 WHERE r1.classid = r2.classid))');
+  */
+  $unused_ranks = $db->query('SELECT rankid, classid FROM Ranks WHERE rankid NOT IN (SELECT DISTINCT rankid FROM Partitions)')
+                     ->fetchAll(PDO::FETCH_ASSOC);
+  foreach ($unused_ranks AS $rank) {
+    if (read_single_value('SELECT COUNT(*) FROM ConstituentClasses WHERE antecedent = :classid',
+                          array(':classid' => $rank['classid'])) > 0) {
+      if (read_single_value('SELECT MIN(rankid) FROM Ranks WHERE classid = :classid',
+                            array(':classid' => $rank['classid'])) == $rank['rankid']) {
+        // Don't delete the first rank of a class that's an antecedent to an aggregate
+        continue;
+      }
+    }
+    $stmt = $db->prepare('DELETE FROM Ranks WHERE rankid = :rankid');
+    $stmt->execute(array(':rankid' => $rank['rankid']));
+  }
+
   if (group_formation_rule() != 'one-group') {
     $db->exec('DELETE FROM Classes'
               .' WHERE classid NOT IN (SELECT DISTINCT classid FROM Ranks)'
@@ -142,16 +159,15 @@ function clean_up_empty_classes_and_ranks() {
 }
 
 // Updates sortorder fields for Partitions to agree with ordering of classes and
-// ranks.  If members of a partition fall in more than class or rank, the
-// ordering for the partition will be based on the first appearance among classes
-// and ranks.
+// ranks.
 function reorder_partitions() {
   global $db;
-  $stmt = $db->prepare('SELECT DISTINCT partitionid FROM '
-                       .inner_join('RegistrationInfo', 'Classes',
-                                   'RegistrationInfo.classid = Classes.classid',
-                                   'Ranks',
-                                   'RegistrationInfo.rankid = Ranks.rankid')
+
+  $stmt = $db->prepare('SELECT partitionid FROM '
+                       .inner_join('Partitions', 'Ranks',
+                                   'Partitions.rankid = Ranks.rankid',
+                                   'Classes',
+                                   'Classes.classid = Ranks.classid')
                        .' ORDER BY Classes.sortorder, Ranks.sortorder');
   $stmt->execute();
 

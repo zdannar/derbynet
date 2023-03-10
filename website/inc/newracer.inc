@@ -33,7 +33,8 @@ function insert_new_racer($values) {
 
   if (!isset($values['partitionid'])) {
     $values['partitionid'] = find_or_create_partition(
-      isset($values['partition']) ? $values['partition'] : DEFAULT_PARTITION_NAME);
+      (isset($values['partition']) && !empty($values['partition']))
+          ? $values['partition'] : DEFAULT_PARTITION_NAME);
   }
   
   if (!isset($values['carnumber']) || $values['carnumber'] == '') {
@@ -60,14 +61,15 @@ function insert_new_racer($values) {
     $values['classid'] = $classid;
     $values['rankid'] = $rankid;
   }
-  json_out('debug', $values);
+
 
   $stmt = $db->prepare('INSERT INTO RegistrationInfo (carnumber, lastname, firstname, carname,'
-                       .'                             partitionid, rankid, classid, exclude)'
+                       .'                             note, partitionid, rankid, classid, exclude)'
                        .' VALUES(:carnumber, :lastname, :firstname, :carname,'
-                       .'        :partitionid, :rankid, :classid, :exclude)');
+                       .'        :note, :partitionid, :rankid, :classid, :exclude)');
   $stmt->execute(array(':carnumber' => trim($values['carnumber']),
                        ':carname' => trim($values['carname']),
+                       ':note' => trim($values['note_from']),
                        ':firstname' => trim($values['firstname']),
                        ':lastname' => trim($values['lastname']),
                        ':partitionid' => $values['partitionid'],

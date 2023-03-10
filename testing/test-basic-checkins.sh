@@ -38,9 +38,14 @@ curl_postj action.php "action=racer.edit&racer=11&firstname=Carroll&lastname=Cyb
 # Change a racer's den
 curl_postj action.php "action=racer.edit&racer=39&firstname=Jeffress&lastname=Jamison&carno=139&carname=&rankid=3" | check_jsuccess
 
+# Reject partitionid -1
+curl_postj action.php "action=racer.edit&racer=45&firstname=Savvy&lastname=Savant&carno=445&carname=&note_from=&partitionid=-1&exclude=0" | check_jfailure
+
 # TODO: There was a bug that the new-row returned from this was basically empty; this doesn't test that
 #
 # After changing a den, adding a new racer used to be a bug (extra Roster row).
 # The effect was observable extra entries for heats that included the
 # den-changed racer.
-curl_postj action.php "action=racer.add&firstname=Fred&lastname=Flintstone&carno=789&carname=&partitionid=2" | check_jsuccess
+curl_postj action.php "action=racer.add&firstname=Fred&lastname=Flintstone&carno=789&carname=&partitionid=2&note_from=Bedrock" | check_jsuccess
+curl_getj "action.php?query=racer.list" | \
+    jq -e '.racers | map(select(.carnumber == 789))[0].note_from == "Bedrock"' > /dev/null || test_fails

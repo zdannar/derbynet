@@ -1,3 +1,22 @@
+
+// This function receives messages from the surrounding replay kiosk, if there
+// is one.
+function on_message(msg) {
+  if (msg == 'replay-started') {
+    // TODO There's a race here: if the flyers have already started when replay takes
+    // over the screen, the audience may not get to see the whole thing.
+    Poller.suspended = true;
+    Lineup.hold();
+  } else if (msg == 'replay-ended') {
+    // Start the timer that blocks advancing to the next heat
+    Lineup.start_display_linger();
+    Lineup.release();
+    Poller.suspended = false;
+    FlyerAnimation.enable_flyers();
+  }
+}
+$(function() { window.onmessage = function(e) { on_message(e.data); }; });
+
 var Lineup = {
   // heat and roundid identify the lineup currently displayed.  They're also
   // sent in the polling query to tell the server what lineup we'd want results
@@ -85,7 +104,7 @@ var Lineup = {
 
       var nheats = current['number-of-heats'];
       if (nheats) {
-        var round_class_name = current.name;
+        var round_class_name = current['class'];
         $('.banner_title').text((round_class_name ? round_class_name + ', ' : '')
                                 + 'Heat ' + this.heat + ' of ' + nheats);
       }
@@ -121,12 +140,10 @@ var Lineup = {
           }
 
           if (r.hasOwnProperty('carname') && r.carname != '') {
-            $('[data-lane="' + lane + '"] .name').append(' <span id="carname-' + lane + '" class="subtitle"/>');
-            $('#carname-' + lane).text('"' + r.carname + '"');
+            $('[data-lane="' + lane + '"] .name').append($("<div class='carname'/>").text(r.carname));
           }
-          if (r.hasOwnProperty('subgroup')) {
-            $('[data-lane="' + lane + '"] .name').append(' <span id="subgroup-' + lane + '" class="subtitle"/>');
-            $('#subgroup-' + lane).text(r.subgroup);
+          if (r.hasOwnProperty('note') && r.note != '') {
+            $('[data-lane="' + lane + '"] .name').append($("<div class='subtitle'/>").text(r.note));
           }
 
           $('[data-lane="' + lane + '"] .carnumber').text(r.carnumber);
@@ -383,28 +400,9 @@ function resize_table() {
   FontAdjuster.table_resized();
 }
 
-// This function receives messages from the surrounding replay kiosk, if there
-// is one.
-function on_message(msg) {
-  if (msg == 'replay-started') {
-    // TODO There's a race here: if the flyers have already started when replay takes
-    // over the screen, the audience may not get to see the whole thing.
-    Poller.suspended = true;
-    Lineup.hold();
-  } else if (msg == 'replay-ended') {
-    // Start the timer that blocks advancing to the next heat
-    Lineup.start_display_linger();
-    Lineup.release();
-    Poller.suspended = false;
-    FlyerAnimation.enable_flyers();
-  }
-}
-
 $(function () {
   resize_table();
   $(window).resize(function() { resize_table(); });
-
-  window.onmessage = function(e) { on_message(e.data); };
 
   // This 1-second delay is to let the initial resizing take effect
   setTimeout(function() { Poller.poll_for_update(0, 0); }, 1000);

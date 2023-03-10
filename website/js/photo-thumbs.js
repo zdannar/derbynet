@@ -19,6 +19,24 @@
 //   </div>
 // </body>
 
+function scroll_to_racerid(racerid) {
+  var thumblist = $(".thumblist");
+  var racer = $("li[data-racer-id=" + racerid + "]");
+  $(".thumblist").animate({scrollTop: thumblist.scrollTop() +
+                           racer.offset().top - thumblist.offset().top},
+                          250);
+  racer.addClass('highlight');
+  setTimeout(function() {
+    racer.removeClass('highlight');
+  }, 250);
+  setTimeout(function() {
+    racer.addClass('highlight');
+  }, 500);
+  setTimeout(function() {
+    racer.removeClass('highlight');
+  }, 750);
+}
+
 // draggable and droppable elements with scope: "assign" are for
 // dragging unassigned photos to racers who are still without a photo.
 //
@@ -45,7 +63,7 @@ function make_assignable(target) {
                                                     '\'' + g_photo_repo_name + '\', ' +
                                                     '\'' + photo_base_name + '\', 0)"' +
                       // RENDER_LISTVIEW (comment for code search)
-					  ' src="photo.php/' + g_photo_repo_name + '/file/80x80/' +
+					  ' src="photo.php/' + g_photo_repo_name + '/file/200x200/' +
 					  encodeURIComponent(photo_base_name) + '/' +
                       'q' + Date.now() + '"/>'); 
 	  make_discardable($(this).find(".assigned"));

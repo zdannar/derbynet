@@ -1,6 +1,7 @@
 <?php
 
 require_once('inc/partitions.inc');
+require_once('inc/path-info.inc');
 require_once('inc/photo-config.inc');
 
 class DriversLicenseDocument extends PrintableRacerDocument {
@@ -37,7 +38,7 @@ class DriversLicenseDocument extends PrintableRacerDocument {
     // $this->DrawBannerText($x, $y);
 
     // Logo in the lower left
-    $this->pdf->Image(image_file_path('emblem.png'),
+    $this->pdf->Image(image_file_path('emblem'),
                       $x + 0.05, $y + 1.95, 0.5, 0.5);
 
     $this->pdf->DrawSequence($x + 0.25, $y + 0.7,
@@ -62,7 +63,7 @@ class DriversLicenseDocument extends PrintableRacerDocument {
     }
 
     $this->pdf->CenteredSequence($x + 1.75, $y + 1.5,
-                                 array(new SetFontTag('Arial', 'B', 24), $racer['carnumber']));
+                                 array(new SetFontTag('Arial', 'B', 24), strval($racer['carnumber'])));
 
     $this->pdf->SetFillColor(0);
     if ($this->get_option('use_barcode')) {

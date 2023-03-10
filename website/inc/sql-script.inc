@@ -12,12 +12,18 @@ function run_sql_script($scriptname) {
   $ok = true;
   $executed = array();
   try {
-    $sql_script = @include_once(sql_file_path($scriptname));
-    if ($sql_script !== FALSE) {
+    $sql_script = @include(sql_file_path($scriptname));
+    if ($sql_script !== false) {
       foreach ($sql_script as $sql_stmt) {
         try {
           $sql_result = $db->exec($sql_stmt);
-          $executed[] = array('sql' => $sql_stmt, 'result' => $sql_result);
+          if ($sql_result !== false) {
+            $executed[] = array('sql' => $sql_stmt, 'result' => $sql_result);
+          } else {
+            json_sql_failure($sql_stmt);
+            $ok = false;
+            break;
+          }
         } catch (PDOException $p) {
           $executed[] = array('sql' => $sql_stmt, 'result' => $sql_result);
 

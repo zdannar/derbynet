@@ -7,8 +7,12 @@ tr.highlight td {
   background-color: #ff8080;
 }
 
+div.carname {
+  font-style: italic;
+}
+
 #edit_racer_modal {
-    width: 400px;
+    width: 600px;
 }
 
 #rank_missing img {
@@ -21,9 +25,26 @@ tr.highlight td {
     width: 720px;
 }
 
+#photo_modal #left-photo {
+  display: inline-block;
+  vertical-align: top;
+  width: 328px; 
+}
+#photo_modal #right-photo {
+  display: inline-block;
+  vertical-align: top;
+  width: 328px;
+  margin-left: 15px;
+}
+
+#thumb-link {
+  /* Don't know why this is necessary, but: */
+  height: 53px;
+}
+
 #preview {
-    width:320px;
-    height:240px;
+    width:640px;
+    height:480px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -112,9 +133,26 @@ input.white-button {
   top: 0px;
 }
 
+#edit_racer_modal #left-edit {
+  display: inline-block;
+  vertical-align: top;
+  width: 290px; 
+}
+#edit_racer_modal #right-edit {
+  display: inline-block;
+  vertical-align: top;
+  width: 290px;
+  margin-left: 15px;
+}
+
+#edit_racer_modal .partition_mselect {
+  margin-top: 11px;
+  margin-bottom: 12px;
+}
+
 #edit_racer_modal .flipswitch {
   font-size: 24px;
-  margin-left: 90px;
+  margin-left: 37px;
   margin-bottom: 30px;
 }
 #edit_racer_modal .block_buttons input,
@@ -133,7 +171,7 @@ input.white-button {
   line-height: 1.0;
 }
 #delete_racer_extension {
-  /* padding-top: 40px; */
+  padding-top: 30px;
 }
 
 
@@ -155,6 +193,25 @@ tr.exclude td.checkin-status {
 img.checkin-photo {
     max-height: 60px;
     max-width: 60px;
+}
+
+#barcode-button {
+  position: absolute;
+  left: 16px;
+  top: 80px;
+}
+
+#mobile-button {
+  position: absolute;
+  left: 100px;
+  top: 75px;
+  width: 100px;
+  height: 37px;
+  font-size: large;
+  line-height: 1.0;
+}
+#mcheckin-link {
+  margin-top: 50px;
 }
 
 #find-racer {

@@ -1,0 +1,156 @@
+#instructions-background {
+  z-index: -200;
+  position: absolute;
+  right: 0px;
+  left: 0px;
+  top: 150px;
+  bottom: 150px;
+}
+#instructions {
+  width: 400px;
+  /* background-color: #c0c0c0; */
+  padding: 30px;
+  margin-left: auto;
+  margin-right: auto;
+}
+#instructions p {
+  font-size: 20px;
+}
+#step1 {
+  font-weight: bold;
+}  
+#instructions img {
+  border: 1px solid blue;
+}
+#instructions input {
+  margin-top: 50px;
+}
+
+#trouble {
+  position: fixed;
+  left: 0px;
+  right: 0px;
+  top: 150px;
+  min-height: 200px;
+
+  background: red;
+  color: white;
+  text-align: center;
+}
+
+video#preview {
+  position: fixed;
+  left: 0px;
+  left: auto;
+  right: auto;
+  top: 60px;
+  z-index: -100;
+  margin-left: auto;
+  margin-right: auto;
+}
+#instructions-overlay,
+#instructions-overlay-background {
+  position: fixed;
+  top: 200px;
+  left: 50%;
+  margin-left: -200px;
+  width: 400px;
+  height: 40px;
+}
+#instructions-overlay {
+  z-index: 100;
+  border: red solid 2px;
+  color: red;
+  padding-top: 14px;
+  text-align: center;
+  font-weight: bold;
+}
+#instructions-overlay-background {
+  z-index: 95;
+  height: 58px; /* instructions height, plus 14px top padding plus 4px v. border */
+  background-color: white;
+  opacity: 20%;
+}
+
+div#flash-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vh;
+  z-index: 100;
+  background: white;
+}
+
+#device-picker-div {
+  position: fixed;
+  top: 100px;
+  left: 0px;
+  right: 0px;
+}
+
+#slide-up {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0px; /* initially */
+  background: #3789fb;
+}
+#racer-div {
+  font-size: 24px;
+  text-align: center;
+  color: white;
+}
+#controls {
+  height: 74px;
+}
+
+#controls-inner {
+  display: inline-block;
+  width: 480px;
+  width: 514px; /* Allows for border and padding in escutcheons? */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.escutcheon {
+  display: inline-block;
+  vertical-align: top;
+  background: white;
+  height: 60px;
+  width: 120px;
+  padding: 4px;
+  margin-left: 60px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  border-radius: 0.4em 0.4em 0.4em 0.4em;
+  cursor: pointer;
+  position: relative;
+}
+.escutcheon .click-blocker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  opacity: 0;
+  z-index: 50;
+}
+.escutcheon img {
+  vertical-align: middle;
+}
+
+.escutcheon img.thumbnail {
+  max-height: 61px;
+  max-width: 55px;
+}
+
+.escutcheon .flipswitch {
+  margin-left: 7px;
+}
+
+#canvas {
+  display: none;
+}

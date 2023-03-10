@@ -139,6 +139,16 @@ check_empty('ranks-ambiguous-sort',
             .' HAVING COUNT(*) > 1');
 
 ////////////////////// RegistrationInfo
+check_empty('racer-partitionid',
+            'SELECT * FROM RegistrationInfo'
+            .' WHERE partitionid NOT IN (SELECT partitionid FROM Partitions)');
+check_empty('racer-classid',
+            'SELECT * FROM RegistrationInfo'
+            .' WHERE classid NOT IN (SELECT classid FROM Classes)');
+check_empty('racer-rankid',
+            'SELECT * FROM RegistrationInfo'
+            .' WHERE rankid NOT IN (SELECT rankid FROM Ranks)');
+
 ////////////////////// Roster
 check_empty('roster-roundid',
             'SELECT * FROM Roster WHERE roundid NOT IN (SELECT roundid FROM Rounds)');
@@ -156,6 +166,12 @@ check_empty('roster-duplicates',
             .' WHERE roundid IN (SELECT roundid FROM Rounds WHERE round = 1)'
             .' GROUP BY racerid, classid '
             .'HAVING COUNT(*) > 1');
+// Each racer should appear in the roster for the first round of the corresponding group
+check_empty('roster-round-classid',
+            'SELECT * FROM RegistrationInfo JOIN Rounds USING (classid)'
+            .' JOIN Roster USING (racerid)'
+            .' WHERE round = 1'
+            .'  AND RegistrationInfo.classid <> Roster.classid');
 
 ////////////////////// Rounds
 check_empty('rounds-sequential',

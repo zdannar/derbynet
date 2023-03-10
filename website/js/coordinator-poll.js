@@ -108,7 +108,7 @@ function update_for_last_heat(json) {
   var rerun_type = json['last-heat'];
   var button = $("#rerun-button");
   var enable = true;
-  button.prop("data-rerun", rerun_type);
+  button.attr("data-rerun", rerun_type);
   if (rerun_type == 'recoverable') {
     button.val("Reinstate Heat");
   } else {
@@ -120,7 +120,7 @@ function update_for_last_heat(json) {
     }
     if (results) {
       button.val("Re-Run This Heat");
-      button.prop("data-rerun", 'current');
+      button.attr("data-rerun", 'current');
     } else if (rerun_type == 'none') {
       button.val("Re-Run");
       enable = false;
@@ -148,7 +148,7 @@ function update_for_current_round(current) {
 }
 
 function generate_timer_state_group(tstate) {
-    $("#timer_status_text").text(tstate.status);
+    $("#timer_status_text").text(tstate.message);
     $("#timer_status_icon").attr('src', tstate.icon);
     if (tstate.lanes != '' && tstate.lanes > 0) {
         $("#lane_count").text(tstate.lanes);
@@ -156,13 +156,9 @@ function generate_timer_state_group(tstate) {
 }
 
 function generate_replay_state_group(replay_state) {
-    $("#replay_status").text(replay_state.status);
-    $("#replay_status_icon").attr('src', replay_state.icon);
-    if (replay_state.connected) {
-        $("#test_replay").removeClass("hidden");
-    } else {
-        $("#test_replay").addClass("hidden");
-    }
+  $("#replay_status").text(replay_state.message);
+  $("#replay_status_icon").attr('src', replay_state.icon);
+  $("#test_replay").toggleClass("hidden", !replay_state.connected);
 }
 
 // Updates progress bars with new progress values
@@ -648,9 +644,21 @@ function process_coordinator_poll_json(json) {
       .append($("<h3 id='timer-testing-herald'>Simulated racing in progress</h3>")
               .append("<input class='stop-test' type='button'"
                       + " onclick='handle_stop_testing();' value='Stop'/>"));
+  } else if (json['refused-results'] > 0) {
+    $("#now-racing-group")
+          .empty()
+          .append($("<div id='timer-testing-herald'></div>")
+                  .append($("<h3></h3>")
+                          .append($("<span></span>").text(json['refused-results']))
+                          .append(json['refused-results'] == 1
+                                  ? " unexpected result from timer has been received."
+                                  : " unexpected results from timer have been received."))
+                  .append("<p>Turn on racing mode or simulate racing if you wish to record results.</p>"));
   } else {
     $('#timer-testing-herald').remove();
   }
+
+  $("#not-racing-warning").toggleClass('hidden', json['current-heat']['now_racing']);;
 
   $("#playlist-start").toggleClass('hidden',
                                    !(json['current-heat'].roundid == -1 && json.rounds.some(r => r.next)));

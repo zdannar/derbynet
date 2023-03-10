@@ -57,6 +57,9 @@ run_tests() {
 
     `dirname $0`/test-extended-scheduling.sh "$BASE_URL"
 
+    `dirname $0`/test-reschedule.sh "$BASE_URL"
+    `dirname $0`/test-rotation-schedule.sh "$BASE_URL"
+
 ############################## Standings by Rank ##############################
     `dirname $0`/test-standing-by-rank.sh "$BASE_URL"
     `dirname $0`/test-each-role.sh "$BASE_URL"
@@ -164,7 +167,7 @@ elif [ "$DBTYPE" == "access" ] ; then
 else
     tput setaf 1  # red text
     echo Unrecognized database type: $DBTYPE
-    echo Known types are: sqlite access
+    echo Known types are: sqlite access ez none
     tput setaf 0  # black text
     exit 1
 fi

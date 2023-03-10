@@ -13,6 +13,7 @@ function describeString(s) {
   for (var i = s.length - 1; i >= 0; --i) {
     var c = s.charCodeAt(i);
     if (20 <= c && c < 127) {
+      // Leave as-is, it's a normal printable character
     } else if (c == 10) {
       s = s.substring(0, i) + "\\n" + s.substring(i + 1);
     } else if (c == 9) {
@@ -73,6 +74,7 @@ class PortWrapper {
       await this.reader.cancel();
     }
 
+    // TODO This may throw if the port is already closed (due to an error, e.g.)
     await this.port.close();
   }
 
@@ -85,10 +87,11 @@ class PortWrapper {
 
         if (value) {
           this.last_char_received = Date.now();
+          var s = utf8decoder.decode(value);
           if (Flag.debug_serial.value) {
-            g_logger.debug_msg('      read(' + describeString(value) + ')');
+            g_logger.debug_msg('      read(' + describeString(s) + ')');
           }
-          this.leftover += utf8decoder.decode(value);
+          this.leftover += s;
           var cr;
           while ((cr = this.leftover.indexOf('\n')) >= 0) {
             this.enqueueLine(this.leftover.substring(0, cr));
@@ -117,9 +120,11 @@ class PortWrapper {
     this.last_char_received = Date.now();
   }
 
+  simulate_lost_connection = false;
   async checkConnection() {
     var age = Date.now() - this.last_char_received;
-    if (age > /*LOST_CONTACT_THRESHOLD*/2000) {
+    if (age > /*LOST_CONTACT_THRESHOLD*/2000 || this.simulate_lost_connection) {
+      this.simulate_lost_connection = false;
       g_logger.internal_msg('PortWrapper.checkConnection detects lost connection by inactivity');
       console.log('PortWrapper.checkConnection detects lost connection by inactivity');
       await this.close();
@@ -189,9 +194,11 @@ class PortWrapper {
     if (this.leftover.length > 0 &&
         Date.now() - this.last_char_received > Flag.newline_expected_ms.value) {
       if (Flag.debug_serial.value) {
-        g_logger.debug_msg('   infer newline(' + describeString(this.leftover) + ')');
+        g_logger.debug_msg('   infer new line for(' + describeString(this.leftover) + ')');
       }
+
       // Don't call enqueueLine here, as we want the string to return now.
+      g_logger.serial_in_inferred(this.leftover);
       var s = this.applyDetectors(this.leftover);
       this.leftover = "";
       if (s.length > 0) {

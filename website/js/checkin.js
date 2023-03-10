@@ -1,35 +1,44 @@
 // Requires dashboard-ajax.js
 // Requires modal.js
 
+// Maps partitionid to highest existing carnumber for that partitionid
+g_max_carnumbers = [];
+function poll_max_carnumbers() {
+  $.ajax(g_action_url,
+         {type: 'GET',
+          data: {query: 'poll',
+                 values: 'car-numbers'},
+          success: function (data) {
+            if (data.hasOwnProperty('car-numbers')) {
+              var carnos = data['car-numbers'];
+              for (var i = 0; i < carnos.length; ++i) {
+                g_max_carnumbers[parseInt(carnos[i].partitionid)] =
+                  carnos[i].max_carnumber;
+              }
+            }
+          }
+         });
+}
+function next_carnumber(partitionid) {
+  // NOTE: 100 * partitionid expression also in car-numbers poll query
+  return 1 + (g_max_carnumbers?.[partitionid] || (100 * partitionid));
+}
+$(function() {
+  setInterval(poll_max_carnumbers, 10000);
+  poll_max_carnumbers();
+
+  $("#edit_partition").on('change', function(event) {
+    // The car number field is updatable only for new racers
+    if ($("#edit_carno").attr('data-updatable')) {
+      var p = parseInt($("#edit_partition").val());
+      if (p && p >= 0) {
+        $("#edit_carno").val(next_carnumber(p));
+      }
+    }
+  });
+});
+
 // var g_order specified in checkin.php
-
-// For the photo_modal dialog, this boolean controls whether the racer gets
-// checked in as a side-effect of uploading a photo.
-var g_check_in;
-
-// Default values for autocrop, depending on repo.  If user changes the setting,
-// that setting endures for the repo for as long as the page is loaded.
-var g_autocrop_head = true;
-var g_autocrop_car = false;
-
-var g_cameras = new Array();
-var g_cameraIndex = 0;
-var g_width = 640;
-var g_height = 480;
-
-function set_autocrop_state(repo) {
-  $("#autocrop").prop('checked', repo == 'head' ? g_autocrop_head : g_autocrop_car);
-  // TODO $("#autocrop").flipswitch("refresh");
-}
-
-function preserve_autocrop_state() {
-  var repo = $("#photo_modal_repo").val();
-  if (repo == 'head') {
-    g_autocrop_head = $("#autocrop").prop('checked');
-  } else {
-    g_autocrop_car = $("#autocrop").prop('checked');
-  }
-}
 
 // This executes when a checkbox for "Passed" is clicked.
 function handlechange_passed(cb, racer) {
@@ -65,6 +74,9 @@ function handlechange_xbs(cb) {
          });
 }
 
+// Two <select> controls for choosing partitions (namely, the one in the
+// #edit_racer_modal and the one in the #bulk_who for car numbering) have an
+// "(Edit partitions)" entry for manipulating the list of partitions.
 function on_edit_partition_change(select, partitions_modal) {
   var select = $(select);
   if (select.val() < 0) {
@@ -72,14 +84,17 @@ function on_edit_partition_change(select, partitions_modal) {
     while (g_modal_dialogs.length > 1) {
       pop_modal();
     }
-    close_modal_leave_background(g_modal_dialogs[0]);
-    show_modal(partitions_modal);
+    push_modal(partitions_modal);
+    select.val(select.prop('last-selected')).trigger('change');
+  } else {
+    select.prop('last-selected', select.val());
   }
 }
 
 function callback_after_partition_modal(op, arg) {
   console.log('callback_after_partition_modal', op, arg);
   if (op == 'add') {  // arg = {partitionid, name}
+    poll_max_carnumbers();
     var opt = $("<option/>")
       .attr('value', arg.partitionid)
         .text(arg.name);
@@ -88,10 +103,14 @@ function callback_after_partition_modal(op, arg) {
     // Delete "Default" partition, if any, after creating a real partition
     $("#edit_partition option[value=0]").remove();
     $("#bulk_who option[value=0]").remove();
-    // Move the "Edit Partitions" option to the end
     divid = -1;
-    $("#edit_partition").append($("#edit_partition option[value=" + divid + "]"));
-    $("#bulk_who").append($("#bulk_who option[value=" + divid + "]"));
+    // Move the "Edit Partitions" option to the end and select the new partition
+    $("#edit_partition").append($("#edit_partition option[value=" + divid + "]"))
+      .val(arg.partitionid).trigger('change');
+    mobile_select_refresh("#edit_partition");
+    $("#bulk_who").append($("#bulk_who option[value=" + divid + "]"))
+      .val(arg.partitionid);
+    mobile_select_refresh("#bulk_who");
   } else if (op == 'delete') {  // arg = {partitionid}
     $("#edit_partition option[value=" + arg.partitionid + "]").remove();
     $("#bulk_who option[value=" + arg.partitionid + "]").remove();
@@ -122,29 +141,31 @@ function show_edit_racer_form(racerid) {
 
   var class_name = $('#class-' + racerid).text();
   var rank_name = $('#rank-' + racerid).text();
+  var note_from = $('#note-from-' + racerid).text();
 
   $("#edit_racer").val(racerid);
 
   $("#edit_firstname").val(first_name);
   $("#edit_lastname").val(last_name);
 
-  $("#edit_carno").val(car_no);
+  $("#edit_carno").removeAttr('data-updatable').val(car_no);
   $("#edit_carname").val(car_name);
+  $("#edit_note_from").val(note_from);
 
-  $("#edit_partition").val($('#div-' + racerid).attr('data-partitionid'));
+  var partitionid = $('#div-' + racerid).attr('data-partitionid');
+  $("#edit_partition").val(partitionid).prop('last-selected', partitionid);
   $("#edit_partition").change();
 
-  $("#eligible").prop("checked", ! $('#lastname-' + racerid).prop("data-exclude"));
+  $("#eligible").prop("checked",
+                      parseInt($('#lastname-' + racerid).attr("data-exclude")) == 0);
   $("#eligible").trigger("change", true);
 
   $("#delete_racer_extension").removeClass('hidden');
 
-  show_modal("#edit_racer_modal", function(event) {
+  show_modal("#edit_racer_modal", "#edit_firstname", function(event) {
     handle_edit_racer();
     return false;
   });
-
-  $("#edit_carno").focus();
 }
 
 function show_new_racer_form() {
@@ -155,10 +176,13 @@ function show_new_racer_form() {
 
   $("#edit_lastname").val("");
 
-  $("#edit_carno").val(9999);
+  var partitionid = $("#edit_partition option").first().attr('value');
+  
+  $("#edit_carno").attr('data-updatable', '1').val(next_carnumber(partitionid));
   $("#edit_carname").val("");
+  $("#edit_note_from").val("");
 
-  $("#edit_partition").val($("#edit_partition option").first().attr('value'));
+  $("#edit_partition").val(partitionid).prop('last-selected', partitionid);
   $("#edit_partition").change();
 
   $("#eligible").prop("checked", true);
@@ -166,7 +190,7 @@ function show_new_racer_form() {
 
   $("#delete_racer_extension").addClass('hidden');
   
-  show_modal("#edit_racer_modal", function(event) {
+  show_modal("#edit_racer_modal", "#edit_firstname", function(event) {
     handle_edit_racer();
     return false;
   });
@@ -181,6 +205,7 @@ function handle_edit_racer() {
   var new_lastname = $("#edit_lastname").val().trim();
   var new_carno = $("#edit_carno").val().trim();
   var new_carname = $("#edit_carname").val().trim();
+  var new_note_from = $("#edit_note_from").val().trim();
 
   var new_div_id = $("#edit_partition").val();
   var new_div_name = $('[value="' + new_div_id + '"]', $("#edit_partition")).text();
@@ -195,6 +220,7 @@ function handle_edit_racer() {
                  lastname: new_lastname,
                  carno: new_carno,
                  carname: new_carname,
+                 note_from: new_note_from,
                  partitionid: new_div_id,
                  exclude: exclude},
           success: function(data) {
@@ -208,14 +234,16 @@ function handle_edit_racer() {
             if (data.hasOwnProperty('new-row')) {
               var row = addrow0(data['new-row']);
               flipswitch(row.find('input[type="checkbox"].flipswitch'));
+              setTimeout(function() { scroll_and_flash_row(row); }, 100);
             } else {
               $("#firstname-" + racerid).text(new_firstname);
               var ln = $("#lastname-" + racerid);
               ln.text(new_lastname);
-              ln.attr("data-exclude", exclude);
+              ln.attr("data-exclude", exclude ? 1 : 0);
               ln.parents('tr').toggleClass('exclude', exclude == 1);
               $("#car-number-" + racerid).text(new_carno);
               $("#car-name-" + racerid).text(new_carname);
+              $("#note-from-" + racerid).text(new_note_from);
               console.log('Changing partition to ' + new_div_name);
               $("#div-" + racerid).attr('data-partitionid', new_div_id).text(new_div_name);
             }
@@ -321,206 +349,6 @@ function bulk_eligibility() {
   });
 }
 
-function disable_preview(msg) {
-  var preview = $("#preview").html('<h2>Webcam Disabled</h2>')
-      .css({'border': '2px solid black',
-            'background': '#d2d2d2'});
-  $("<p></p>").text(msg).css({'font-size': '18px'}).appendTo(preview);
-
-  if (window.location.protocol == 'http:') {
-    var https_url = "https://" + window.location.hostname + window.location.pathname;
-    $("<p>You may need to switch to <a href='" +  https_url + "'>" + https_url + "</a></p>")
-      .css({'font-size': '18px'})
-      .appendTo(preview);
-  }
-}
-
-// In (some versions of) Safari, if Flash isn't enabled, the Webcam instance
-// just silently fails to load.  We want to present a modal to the user in that
-// case, so make clear what the issue is.
-function arm_webcam_dialog() {
-  var loaded = false;
-  Webcam.on('load', function() { loaded = true; });
-  // If the Webcam instance is going to present an error, we don't want to put
-  // up another one.
-  Webcam.on('error', function(msg) {
-    loaded = true;
-    disable_preview(msg);
-  });
-  setTimeout(function() {
-    if (!loaded) {
-      disable_preview('You may have to enable Flash, or give permission to use your webcam.');
-    }
-  }, 5000);
-}
-
-// For #photo_drop form:
-Dropzone.options.photoDrop = {
-  paramName: 'photo',
-  maxFiles: 1,
-  maxFilesize: 8,
-  url: 'action.php',
-  acceptedFiles: 'image/*',
-  // dropzone considers the upload successful as long as there was an HTTP response.  We need to look at the
-  // message that came back and determine whether the file was actually accepted.
-  sending: function(xhr, form_data) {
-    preserve_autocrop_state();
-  },
-  success: function(file, response) {
-    this.removeFile(file);
-
-    var data = $.parseXML(response);
-    var photo_url_element = data.getElementsByTagName('photo-url');
-    if (photo_url_element.length > 0) {
-      $("#photo-" + $("#photo_modal_racerid").val() + " img[data-repo='" + $("#photo_modal_repo").val() + "']").attr(
-        'src', photo_url_element[0].childNodes[0].nodeValue);
-    }
-
-    close_modal("#photo_modal");
-  },
-};
-
-function setup_webcam() {
-  var settings = {
-	width: g_width,
-	height: g_height,
-	dest_width: g_width,
-	dest_height: g_height,
-	crop_width: g_width,
-	crop_height: g_height,
-  };
-  if (g_cameraIndex < g_cameras.length && g_cameras[g_cameraIndex]) {
-	settings['constraints'] = {
-	  deviceId: {exact: g_cameras[g_cameraIndex]}
-	};
-  }
-  Webcam.set(settings);
-}
-
-window.addEventListener('orientationchange', function() {
-  if (screen.width < screen.height) {
-    g_width = 480;
-    g_height = 640;
-  } else {
-    g_width = 640;
-    g_height = 480;
-  }
-
-  Webcam.reset();
-  setup_webcam();
-  Webcam.attach('#preview');
-});
-
-// ***********************
-// Original definition, minus the enumerate_cameras call.  On modern browsers,
-// this gets redefined, below, to use ES6-only features.
-function show_photo_modal(racerid, repo) {
-  var firstname = $('#firstname-' + racerid).text();
-  var lastname = $('#lastname-' + racerid).text();
-  $("#racer_photo_name").text(firstname + ' ' + lastname);
-  $("#racer_photo_repo").text(repo);
-  $("#photo_modal_repo").val(repo);
-  $("#photo_modal_racerid").val(racerid);
-
-  set_autocrop_state(repo);
-
-  // If the racer's already been checked in, don't offer "Capture & Check In" button
-  $("#capture_and_check_in").toggleClass('hidden', $("#passed-" + racerid).prop('checked'));
-
-  // TODO Two different submit buttons that set a global, g_check_in.  Eww.
-  show_modal("#photo_modal", function() {
-    preserve_autocrop_state();
-    take_snapshot(racerid, repo, lastname + '-' + firstname);
-    return false;
-  });
-
-  if (screen.width < screen.height) {
-    g_width = 480;
-    g_height = 640;
-  }
-
-  arm_webcam_dialog();
-
-  Webcam.reset();
-  setup_webcam();
-  Webcam.attach('#preview');
-}
-
-function show_racer_photo_modal(racerid) {
-  show_photo_modal(racerid, 'head');
-}
-function show_car_photo_modal(racerid) {
-  show_photo_modal(racerid, 'car');
-}
-
-function take_snapshot(racerid, repo, photo_base_name) {
-  if (photo_base_name.length <= 1) {
-    photo_base_name = 'photo';
-  }
-
-  // g_check_in set by onclick method in submit buttons
-  if (g_check_in) {
-    $("#passed-" + racerid).prop('checked', true);
-    $("#passed-" + racerid).trigger("change", true);
-
-    $.ajax(g_action_url,
-           {type: 'POST',
-            data: {action: 'racer.pass',
-                   racer: racerid,
-                   value: 1},
-           });
-  }
-
-  Webcam.snap(function(data_uri) {
-	// detect image format from within image_data_uri
-	var image_fmt = '';
-	if (data_uri.match(/^data\:image\/(\w+)/))
-	  image_fmt = RegExp.$1;
-	else
-	  throw "Cannot locate image format in Data URI";
-
-	// extract raw base64 data from Data URI
-	var raw_image_data = data_uri.replace(/^data\:image\/\w+\;base64\,/, '');
-
-	// create a blob and decode our base64 to binary
-	var blob = new Blob( [ Webcam.base64DecToArr(raw_image_data) ], {type: 'image/'+image_fmt} );
-
-	// stuff into a form, so servers can easily receive it as a standard file upload
-	var form_data = new FormData();
-	form_data.append('action', 'photo.upload');
-    form_data.append('racerid', racerid);
-    form_data.append('repo', repo);
-    // image_fmt.replace is for jpeg -> jpg
-	form_data.append('photo', blob, photo_base_name + "." + image_fmt.replace(/e/, ''));
-    if ($("#autocrop").prop('checked')) {
-      form_data.append('autocrop', '1');
-    }
-
-    // Testing for <failure> elements occurs in dashboard-ajax.js
-    $.ajax(g_action_url,
-           {type: 'POST',
-            data: form_data,
-            contentType: false,
-            processData: false,
-            success: function(data) {
-              var photo_url_element = data.getElementsByTagName('photo-url');
-              if (photo_url_element.length > 0) {
-                $("#photo-" + racerid + " img[data-repo='" + repo + "']").attr(
-                  'src', photo_url_element[0].childNodes[0].nodeValue);
-              }
-            }
-           });
-
-    Webcam.reset();
-    close_modal("#photo_modal");
-  });
-}
-
-function close_photo_modal() {
-  Webcam.reset();
-  close_modal("#photo_modal");
-}
-
 function compare_first(a, b) {
   for (var i = 0; i < a[0].length; ++i) {
     if (a[0][i] < b[0][i]) return -1;
@@ -610,6 +438,28 @@ function on_barcode_handling_change() {
   return false;
 }
 
+function update_qrcode() {
+  $("#mobile-checkin-qrcode").empty();
+  $("#mobile-checkin-title").text($("#mobile-checkin-url").val());
+  new QRCode(document.getElementById('mobile-checkin-qrcode'),
+             {text: $("#mobile-checkin-url").val(),
+              width: 256,
+              height: 256});
+}
+function handle_qrcode_button_click() {
+  update_qrcode();
+  show_modal("#qrcode_settings_modal");
+}
+function on_mobile_checkin_submit() {
+  console.log('on_mobile_checkin_submit');
+  update_qrcode();
+  return false;
+}
+$(function() {
+  $("#mobile-checkin-url").val(g_preferred_urls[0] + "/mcheckin.php");
+  $("#mobile-checkin-form").on('submit', on_mobile_checkin_submit);
+});
+
 function global_keypress(event) {
   if ($(":focus").length == 0) {
     $(document).off("keypress");  // We want future keypresses to go to the search form
@@ -674,7 +524,6 @@ function maybe_barcode(raw_search) {
   }
   
   scroll_and_flash_row(row);
-  console.log(g_action_on_barcode);
 
   var racerid = row.attr('data-racerid');
   if (g_action_on_barcode == "locate") {
@@ -828,14 +677,19 @@ function make_table_row(racer, xbs) {
 
   tr.append($('<td class="sort-lastname"/>')
             .attr('id', 'lastname-' + racer.racerid)
-            .attr('data-exclude', racer.exclude)
+            .attr('data-exclude', racer.exclude ? 1 : 0)
             .text(racer.lastname));
   tr.append($('<td class="sort-firstname"/>')
             .attr('id', 'firstname-' + racer.racerid)
             .text(racer.firstname));
   tr.append($('<td/>')
-            .attr('id', 'car-name-' + racer.racerid)
-            .text(racer.carname));
+            .append($("<div/>")
+                    .attr('id', 'car-name-' + racer.racerid)
+                    .addClass('carname')
+                    .text(racer.carname))
+            .append($("<div/>")
+                    .attr('id', 'note-from-' + racer.racerid)
+                    .text(racer.note)));
 
   var checkin = $('<td class="checkin-status"/>').appendTo(tr);
   if (racer.scheduled) {

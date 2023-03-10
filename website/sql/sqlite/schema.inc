@@ -2,8 +2,10 @@
 // SQLite
 require_once('inc/schema_version.inc');
 
-function make_index($table, $column) {
-  return "CREATE INDEX IF NOT EXISTS ".$table."_".$column." ON ".$table."(".$column.")";
+if (!function_exists('make_index')) {
+  function make_index($table, $column) {
+    return "CREATE INDEX IF NOT EXISTS ".$table."_".$column." ON ".$table."(".$column.")";
+  }
 }
 
 return array_merge(
@@ -14,7 +16,7 @@ array(
 
 "CREATE TABLE `Awards` ("
 ."  `awardid` INTEGER PRIMARY KEY, "
-."  `awardname` VARCHAR(50) NOT NULL, "
+."  `awardname` VARCHAR(100) NOT NULL, "
 ."  `awardtypeid` INTEGER NOT NULL DEFAULT 1, "
 ."  `classid` INTEGER, "
 ."  `rankid` INTEGER, "
@@ -35,9 +37,9 @@ make_index("Awards", "sort"),
 .")",
   ),
 
-@include_once(sql_file_path('audit-table')),
+@include(sql_file_path('audit-table')),
 
-@include_once(sql_file_path('events-table')),
+@include(sql_file_path('events-table')),
 
 array(
 
@@ -45,7 +47,7 @@ array(
 
 "CREATE TABLE `Classes` ("
 ."  `classid` INTEGER PRIMARY KEY, "
-."  `class` VARCHAR(15) NOT NULL UNIQUE COLLATE NOCASE"
+."  `class` VARCHAR(75) NOT NULL UNIQUE COLLATE NOCASE"
 .(expected_schema_version() < 3 ? "" :
   // For aggregate classes, constituents is a comma-separated list of classids, and
   // durable is true if the aggregate class was created explicitly by the user, otherwise
@@ -110,7 +112,7 @@ make_index("RaceInfo", "itemkey"),
 
 "CREATE TABLE `Ranks` ("
 ."  `rankid` INTEGER PRIMARY KEY, "
-."  `rank` VARCHAR(15) NOT NULL COLLATE NOCASE, "
+."  `rank` VARCHAR(75) NOT NULL COLLATE NOCASE, "
 ."  `classid` INTEGER NOT NULL"
 .(expected_schema_version() < 2 ? "" : ",  `sortorder` INTEGER ")
 .")",
@@ -122,9 +124,9 @@ make_index("Ranks", "rank"),
 "CREATE TABLE `RegistrationInfo` ("
 ."  `racerid` INTEGER PRIMARY KEY, "
 ."  `carnumber` INTEGER NOT NULL, "
-."  `carname` VARCHAR(20), "
-."  `lastname` VARCHAR(20) NOT NULL COLLATE NOCASE, "
-."  `firstname` VARCHAR(15) NOT NULL COLLATE NOCASE, "
+."  `carname` VARCHAR(30), "
+."  `lastname` VARCHAR(30) NOT NULL COLLATE NOCASE, "
+."  `firstname` VARCHAR(30) NOT NULL COLLATE NOCASE, "
 ."  `classid` INTEGER NOT NULL, "
 ."  `rankid` INTEGER NOT NULL, "
 ."  `partitionid` INTEGER NOT NULL,"
@@ -168,21 +170,23 @@ make_index("Rounds", "classid"),
 make_index("Rounds", "round"),
   ),
 
-@include_once(sql_file_path('kiosk-table')),
+@include(sql_file_path('kiosk-table')),
 
-@include_once(sql_file_path('message-queue-table')),
+@include(sql_file_path('message-queue-table')),
 
-@include_once(sql_file_path('scene-tables')),
+@include(sql_file_path('scene-tables')),
 
-@include_once(sql_file_path('playlist-table')),
+@include(sql_file_path('playlist-table')),
 
-@include_once(sql_file_path('award-type-values')),
+@include(sql_file_path('award-type-values')),
 
-@include_once(sql_file_path('balloting')),
+@include(sql_file_path('balloting')),
 
-@include_once(sql_file_path('timer-settings')),
+@include(sql_file_path('timer-settings')),
 
-@include_once(sql_file_path('partitions')),
+@include(sql_file_path('partitions')),
+
+@include(sql_file_path('event-lane-details')),
 
 array(
 "INSERT INTO RaceInfo (itemkey, itemvalue) VALUES ('schema', ".expected_schema_version().")",

@@ -57,6 +57,17 @@ table.event-history tr.event.irregular td {
   background: #ffdddd;
 }
 
+table.event-history tr.event-explanation.discarded-event td {
+  text-align: left;
+}
+table.event-history tr.event-explanation.first td {
+  border-bottom-width: 0px;
+}
+table.event-history tr.event-explanation.follow-on td {
+  border-top-width: 0px;
+}
+/* first, follow-on */
+
 table.event-history tr.event td:first-child {
   border-left-width: 2px;
 }
@@ -120,8 +131,11 @@ $is_interleaved = use_master_sched();
 class EventFormatter {
   public function HeatIdentifier(&$event) {
     switch ($event['action']) {
-    case EVENT_RESULT_DISCARDED: 
-    case EVENT_HEAT_COMPLETED: {
+    case EVENT_HEAT_RESULT_DISCARDED: 
+    case EVENT_HEAT_RESULT_FROM_TIMER:
+    case EVENT_HEAT_RESULT_DISCARDED:
+    case EVENT_HEAT_RESULT_REINSTATED:
+    {
       return $this->HeatName($event);
       break;
     }
@@ -136,48 +150,45 @@ class EventFormatter {
       return 'Timer Malfunction: '.$event['other'];
       break;
     case EVENT_TIMER_RESULT_REFUSED:
-      return 'Refused result, lane '.$event['lane'].': '.$event['other'];
-    case EVENT_RESULT_DISCARDED: {
-      return 'Discarded: lane '.$event['lane']
-             .', car '.htmlspecialchars($this->RacerName($event), ENT_QUOTES, 'UTF-8')
-      .': '.$event['other'];
-      break;
-    }
-    case EVENT_HEAT_COMPLETED: {
+      return "Refused result, lane $event[lane]: $event[other]";
+    case EVENT_TIMER_OVERDUE:
+      return "Timer heartbeat transmission overdue by $event[other]ms";
+    case EVENT_HEAT_RESULT_DISCARDED:
+      return "Heat results discarded";
+    case EVENT_HEAT_RESULT_REINSTATED:
+      return "Heat results reinstated";
+    case EVENT_HEAT_RESULT_FROM_TIMER: {
       return 'Original heat completion';
-      break;
     }
     case EVENT_HEAT_MANUALLY_ENTERED:
       return 'Manually entered result';
-      break;
 
     case EVENT_CLASS_ADDED:
       return 'Created group '.htmlspecialchars($event['other'], ENT_QUOTES, 'UTF-8')
-          .' ('.$event['classid'].')';
+          ." (#$event[classid])";
     case EVENT_CLASS_DELETED:
       return "Deleted group $event[other] ($event[classid])";
     case EVENT_RANK_ADDED:
       return 'Created subgroup '.htmlspecialchars($event['other'], ENT_QUOTES, 'UTF-8')
-          .' ('.$event['rankid'].' in group '.$event['classid'].')';
+      .' (#'.$event['rankid'].') in '.$this->ClassName($event);
     case EVENT_RANK_DELETED:
       if ($event['classid'] < 0) {
-        return "Deleted all subgroups from group $event[other] ($event[classid])";
+        return "Deleted all subgroups from $event[other] (#$event[classid])";
       } else {
-        return "Deleted subgroup $event[other] ($event[rankid])";
+        return "Deleted subgroup $event[other] (#$event[rankid])";
       }
     case EVENT_ROUND_ADDED:
-      return "Created $event[other] for group $event[classid] (roundid $event[roundid])";
+      return "Created $event[other] (#$event[roundid]) for ".$this->ClassName($event);
     case EVENT_ROUND_DELETED:
-      return "Deleted round $event[roundid] for group $event[classid]";
+      return "Deleted round $event[roundid] for ".$this->ClassName($event);
     case EVENT_SCHEDULE_ADDED:
-      return "Generated schedule for round $event[roundid]";
+      return "Generated schedule for ".$this->RoundName($event);
     case EVENT_SCHEDULE_DELETED:
-      return "Deleted schedule for round $event[roundid] $event[other]";
-
+      return "Deleted schedule for ".$this->RoundName($event)." $event[other]";
     case EVENT_PURGE_RESULTS:
       return "Purged race results";
     case EVENT_PURGE_RESULTS_ONE_ROUND:
-      return "Purge race results for roundid $event[roundid]";
+      return "Purge race results for ".$this->RoundName($event);
     case EVENT_PURGE_SCHEDULES:
       return "Purged schedules";
     case EVENT_PURGE_RACERS:
@@ -201,88 +212,72 @@ class EventFormatter {
   }
 
   private function RacerName(&$event) {
-      $racer = read_single_row('SELECT carnumber, firstname, lastname'
-                               .' FROM RegistrationInfo'
-                               .' WHERE racerid = :racerid',
-                               array(':racerid' => $event['racerid']));
-      return $racer[0].', '.$racer[1].' '.$racer[2];
+    $racer = read_single_row('SELECT carnumber, firstname, lastname'
+                             .' FROM RegistrationInfo'
+                             .' WHERE racerid = :racerid',
+                             array(':racerid' => $event['racerid']));
+    return htmlspecialchars("$racer[0], $racer[1] $racer[2] (#$event[racerid])",
+                            ENT_QUOTES, 'UTF-8');
   }
   
   private function HeatName(&$event) {
+    return $this->RoundName($event)." heat $event[heat]";
+  }
+
+  private function RoundName(&$event) {
     $round = read_single_row('SELECT class, round FROM Rounds'
                              .' INNER JOIN Classes'
                              .' ON Classes.classid = Rounds.classid'
                              .' WHERE Rounds.roundid = :roundid',
                              array(':roundid' => $event['roundid']),
                              PDO::FETCH_ASSOC);
-    return $round['class']
-        .($round['round'] > 1 ? ' round '.$round['round'] : '')
-        .' heat '.$event['heat'];
+    if ($round === false) {
+      return htmlspecialchars("roundid =$event[roundid]", ENT_QUOTES, 'UTF-8');
+    } else if ($round['round'] > 1) {
+      return htmlspecialchars("$round[class] round $round[round] (#$event[roundid])", ENT_QUOTES, 'UTF-8');
+    } else {
+      return htmlspecialchars("$round[class] (R#$event[roundid])", ENT_QUOTES, 'UTF-8');
+    }
+  }
+
+  private function ClassName(&$event) {
+    $c = read_single_value('SELECT class FROM Classes WHERE classid = :classid',
+                           array(':classid' => $event['classid']));
+    return htmlspecialchars("$c (#$event[classid])", ENT_QUOTES, 'UTF-8');
   }
 }
 
 $event_formatter = new EventFormatter;
 
 
-$event_stmt = $db->prepare('SELECT tstamp, action, racerid, classid, rankid, roundid, heat, lane, other'
+$event_stmt = $db->prepare('SELECT tstamp, action, racerid, classid, rankid, roundid, heat, other'
                            .' FROM Events'
                            .' WHERE action > 10'
-                           .' ORDER BY tstamp, lane');
+                           .' ORDER BY tstamp');
 $event_stmt->execute();
-$event = $event_stmt->fetch();
 
-$heat_stmt = $db->prepare('SELECT roundid, class, heat, completed'
-                          .' FROM RaceChart'
-                          .' INNER JOIN Classes ON RaceChart.classid = Classes.classid'
-                          .' WHERE COALESCE(completed, \'\') <> \'\''
-                          .' GROUP BY roundid, heat'
-                          .' ORDER BY completed');
-$heat_stmt->execute();
-$heat = $heat_stmt->fetch();
+foreach ($event_stmt as $event) {
 
-$last_unix = 0;  // Unix timestamp of last heat
-$roundid = 0;  // Current roundid
+// Each heat is <heat identifier>  <time and date>  <delta-t>
+//
+// Each event is two rows:
+//  <heat identifier>  <timestamp>   <empty>
+//    <event description>
 
-while ($event !== false || $heat !== false) {
-  if ($heat !== false && ($event === false || $heat['completed'] < $event['tstamp'])) {
-    $unix = strtotime($heat['completed']);
-
-    echo "<tr class='heat'>";
-    echo "<td>".htmlspecialchars($heat['class'].' heat '.$heat['heat'], ENT_QUOTES, 'UTF-8')."</td>";
-    echo "<td>".$heat['completed']."</td>";
-
-    if (($is_interleaved && $roundid != 0) || $heat['roundid'] == $roundid) {
-      $diff = $unix - $last_unix;
-      $min = floor($diff / 60);
-      $sec = $diff % 60;
-      echo "<td>".sprintf("%dm%02ds", $min, $sec)."</td>";
-    } else {
-      echo "<td></td>";
-      $roundid = $heat['roundid'];
-    }
-    $last_unix = $unix;
-    echo "</tr>";
-
-    $heat = $heat_stmt->fetch();
-  }
-
-  if ($event !== false && ($heat === false || $event['tstamp'] <= $heat['completed'])) {
-    $irregular = $event['action'] == 100 || $event['action'] >= 300 ? 'irregular' : '';
+    $irregular = $event['action'] == EVENT_HEAT_RESULT_DISCARDED ||
+               $event['action'] == EVENT_HEAT_RESULT_REINSTATED ||
+               $event['action'] >= 300
+               ? 'irregular' : '';
     echo "<tr class='event $irregular event-identifier'>";
-    echo "<td>".htmlspecialchars($event_formatter->HeatIdentifier($event), ENT_QUOTES, 'UTF-8')."</td>";
+    echo "<td>".$event_formatter->HeatIdentifier($event)."</td>";
     echo "<td>".$event['tstamp']."</td>";
     echo "<td></td>";
     echo "</tr>\n";
     echo "<tr class='event $irregular event-explanation'><td colspan='3'>";
-
     echo $event_formatter->Format($event);
-
-    // echo "<br/>\n";
-
     echo "</td>";
     echo "</tr>\n";
-    $event = $event_stmt->fetch();
-  }
+
 }
 
 ?>

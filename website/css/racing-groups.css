@@ -3,9 +3,24 @@
   font-size: 1em;
 }
 
+ul#aggregate-groups {
+  margin-top: 10px;  
+  margin-left: 10px;
+}
 div#race-rules, ul#all-groups {
   width: 400px;
   margin-left: 10px;
+}
+
+div.labels {
+  font-size: 18px;
+}
+
+div.block_buttons input.modest-button {
+  width: auto;
+  padding: 5px 10px;
+  font-size: large;
+  margin-top: 10px;
 }
 
 div.switch label {
@@ -60,6 +75,9 @@ li.partition {
 li.group > p, .group-color {
   background-color: #8da5c6;
 }
+li.group > ul.subgroups {
+  min-height: 20px;
+}
 li.aggregate > p {
   background-color: #72c5ac;
 }
@@ -104,10 +122,14 @@ li.constituent {
 }
 li.constituent p {
 }
-  
-li.ui-droppable-hover, p.ui-droppable-hover, div.ui-droppable-hover {
+
+li#new-group {
+    min-height: 50px;
+}
+li.ui-droppable-hover, p.ui-droppable-hover, div.ui-droppable-hover,
+li.ui-droppable-hover p {
   background-color: #ffcccc;
-  border: #ff0000 4px solid;
+  /* border: #ff0000 4px solid; */
 }
 
 span.label, span.count {
@@ -147,6 +169,7 @@ div#race-rules {
 div#race-structure {
   margin-left: 410px;
   height: 100%;
+  width: 420px;
 }
 div#new-group {
   margin-left: 1.2em;
