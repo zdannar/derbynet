@@ -9,3 +9,15 @@ services:
     build:
       context: .
       dockerfile: installer/docker/Dockerfile 
+    links:
+      - mysql:mysql
+
+  mysql:
+    platform: linux/amd64
+    hostname: mysql
+    image: mysql:8.0-debian
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=derbynet
+    # connection string: mysql:host=mysql;dbname=derbynet;password=password;user=root
+    
