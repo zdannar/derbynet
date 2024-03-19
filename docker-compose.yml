@@ -5,7 +5,7 @@ services:
     ports:
       - "80:80"
     hostname: derbynet
-    image: derbynet
+    image: derbynet:latest
     build:
       context: .
       dockerfile: installer/docker/Dockerfile 
